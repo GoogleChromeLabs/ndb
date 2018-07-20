@@ -6,55 +6,82 @@
 
 <img src="https://raw.githubusercontent.com/ChromeDevTools/devtools-logo/master/192.png" height="200" align="right">
 
-> ndb is improved Chrome DevTools tuned for Node.js. ndb is distributed as npm package and can be installed by one npm  command.
+> ndb is improved debugging experience for Node.js, enabled by Chrome DevTools
 
 ## Installation
 
 ```bash
 npm install -g ndb
 ```
-Note: ndb works with Node.js >=8.0.0 and works best with latest Node.js 10.
+Compatibility: ndb requires Node >=8.0.0. It works best with Node >=10.
 
-Note: ndb depends on puppeteer, puppeteer downloads a recent version of Chromium (~170Mb Mac, ~282Mb Linux, ~280Mb Win).
+Installation: ndb depends on [Puppeteer](https://github.com/GoogleChrome/puppeteer) which downloads a recent version of Chromium (~170MB Mac, ~280MB Linux, ~280MB Win).
 
-Note: installation may fail on Windows during compilation of one of native dependency, following command may help:
+Windows users: Installation may fail on Windows during compilation the native dependencies. The following command may help: `npm install --g --production windows-build-tools`
 
-```bash
-npm install --global --production windows-build-tools
-```
+
 ## Getting Started
-### How to start ndb?
+
 You can start debugging your Node.js application using one of the following ways:
-- use ndb instead of node:
+
+- Use `ndb` instead of the `node` command
+
 ```bash
-node index.js 🠲 ndb index.js
-# if you use some other binary, just prepend ndb.
-npm run unit 🠲 ndb npm run unit
+ndb server.js
+
+# Alternatively, you can prepend `ndb`
+ndb node server.js
 ```
-- run ndb and start debugging any configuration from your package.json, e.g. unit tests, from ndb UI:
+
+- Prepend `ndb` in front of any other binary
+
 ```bash
-# cd to application folder with package.json file.
+# If you use some other binary, just prepend `ndb`
+## npm run unit
+ndb npm run unit
+
+# Debug any globally installed package
+## mocha
+ndb mocha
+a
+# To use a local binary, use `npx` and prepend before it
+ndb npx mocha
+```
+
+- Launch `ndb` as a standalone application 
+   - Then, debug any npm script from your `package.json`, e.g. unit tests
+
+```bash
+# cd to your project folder (with a package.json)
 ndb .
-# go to "Run configuration" sidebar and click "Run" button next to target configuration.
+# In Sources panel > "NPM Scripts" sidebar, click the selected "Run" button 
 ```
-- run any node related command from builtin terminal, ndb will connect automatically.
 
-### What can I do?
-You can use any JavaScript related Chrome DevTools features:
-- debugger (breakpoint, async stacks, async stepping, ...),
-- console (eager evaluation (required Node.js 10), object inspection, advanced filtering, ...),
-- CPU profiler,
-- memory profiler.
+- Run any node command from within ndb's integrated terminal and ndb will connect automatically
 
-There are couple Chrome DevTools Node.js specific features that are available only for ndb:
-1. full support for child processes,,
-2. you can edit your files from DevTools and save all changes to disk,
-3. ndb by default blackbox all scripts outside current working directory, it helps you to focus on debugging your code (this behaviour may be changed by "Blackbox anything outside working dir" setting).
-    
-## Contributing to ndb
+## What can I do?
+
+`ndb` has some powerful features exclusively for Node.js:
+1. Child processes are detected and attached to.
+1. You can place breakpoints before the modules are required.
+1. You can edit your files within the UI. On Ctrl-S/Cmd-S, DevTools will [save the changes to disk](https://developers.google.com/web/tools/chrome-devtools/workspaces/).
+1. By default, ndb [blackboxes](https://developers.google.com/web/tools/chrome-devtools/javascript/reference#blackbox) all scripts outside current working directory to improve focus. This includes node internal libraries (like `_stream_wrap.js`, `async_hooks.js`, `fs.js`) This behaviour may be changed by "Blackbox anything outside working dir" setting. 
+
+In addition, you can use all the DevTools functionality that you've used in [typical Node debugging](https://medium.com/@paul_irish/debugging-node-js-nightlies-with-chrome-devtools-7c4a1b95ae27):
+- breakpoint debugging, async stacks (AKA long stack traces), [async stepping](https://developers.google.com/web/updates/2018/01/devtools#async), etc...
+- console (top-level await, object inspection, advanced filtering)
+- [eager evaluation](https://developers.google.com/web/updates/2018/05/devtools#eagerevaluation) in console (requires Node >= 10)
+- JS sampling profiler
+- memory profiler
+
+### Screenshot
+![image](https://user-images.githubusercontent.com/39191/43023843-14a085a6-8c21-11e8-85b7-b9fd3405938a.png)
+
+
+## Contributing
 
 Check out [contributing guide](https://github.com/GoogleChromeLabs/ndb/blob/master/CONTRIBUTING.md) to get an overview of ndb development.
 
-## Thanks to the 'OG' `ndb`
+#### Thanks to the 'OG' `ndb`
 
 In early 2011, [@smtlaissezfaire](https://github.com/smtlaissezfaire) released the first serious debugger for Node.js, under the `ndb` package name. It's still preserved at [github.com/smtlaissezfaire/ndb](https://github.com/smtlaissezfaire/ndb#readme). We thank Scott for generously donating the package name.
