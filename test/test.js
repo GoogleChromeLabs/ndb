@@ -428,7 +428,7 @@ describe('NddService', function() {
 
     const paused = await service.onMessage(1, params => JSON.parse(params.message).method === 'Debugger.paused');
     const location = JSON.parse(paused.message).params.callFrames[0].location;
-    assert.equal(16, location.lineNumber);
+    assert.equal(6, location.lineNumber);
     assert.equal(2, location.columnNumber);
 
     service.detach({
@@ -513,7 +513,7 @@ describe('NddService', function() {
     const paused = await service.onMessage(1, params => JSON.parse(params.message).method === 'Debugger.paused');
 
     const location = JSON.parse(paused.message).params.callFrames[0].location;
-    assert.equal(16, location.lineNumber);
+    assert.equal(6, location.lineNumber);
     assert.equal(2, location.columnNumber);
 
     service.detach({

@@ -1,0 +1,8 @@
+/.local-frontend/
+/node_modules/
+.DS_Store
+*.swp
+*.pyc
+.vscode
+package-lock.json
+yarn.lock

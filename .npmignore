@@ -1,0 +1,19 @@
+# exclude all tests
+test/
+test/fs/
+
+# repeats from .gitignore
+/.local-frontend/
+/node_modules/
+.DS_Store
+*.swp
+*.pyc
+.vscode
+package-lock.json
+yarn.lock
+
+# other
+.editorconfig
+.eslintignore
+.eslintrc.js
+README.md
