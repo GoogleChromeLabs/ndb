@@ -1,0 +1,13 @@
+{
+  "Inspector.drawerSplitViewState": "{\"horizontal\":{\"size\":200,\"showMode\":\"Both\"}}",
+  "console.sidebarSelectedFilter": "\"message\"",
+  "console.sidebar.width": "{\"vertical\":{\"size\":0,\"showMode\":\"OnlyMain\"}}",
+  "panel-selectedTab": "\"sources\"",
+  "sourcesPanelSplitViewState": "{\"vertical\":{\"size\":0,\"showMode\":\"Both\"}}",
+  "sourcesPanelNavigatorSplitViewState": "{\"vertical\":{\"size\":0,\"showMode\":\"Both\"}}",
+  "panel-tabOrder": "{\"sources\":10,\"js_profiler\":20,\"heap_profiler\":30,\"console\":40}",
+  "settings-view-tabOrder": "{\"preferences\":10,\"workspace\":20,\"experiments\":30,\"blackbox\":40,\"Shortcuts\":50}",
+  "uiTheme": "\"dark\"",
+  "sourcePanelNavigatorSidebarSplitViewState": "{\"horizontal\":{\"size\":305}}",
+  "autoRevealInNavigator": "true"
+}

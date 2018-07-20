@@ -1,0 +1,9 @@
+{
+  "modules" : [
+     { "name": "ndb", "type": "autostart" },
+     { "name": "js_profiler" },
+     { "name": "ndb_ui" }
+ ],
+  "extends": "shell",
+  "has_html": true
+}

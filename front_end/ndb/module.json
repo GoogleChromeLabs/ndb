@@ -1,0 +1,44 @@
+{
+    "extensions": [
+        {
+            "type": "early-initialization",
+            "className": "Ndb.NdbMain"
+        },
+        {
+            "type": "setting",
+            "category": "Debugger",
+            "title": "Pause node app on start",
+            "settingName": "pauseAtStart",
+            "settingType": "boolean",
+            "defaultValue": false
+        },
+        {
+            "type": "setting",
+            "category": "Debugger",
+            "title": "Wait at end",
+            "settingName": "waitAtEnd",
+            "settingType": "boolean",
+            "defaultValue": false
+        },
+        {
+            "type": "setting",
+            "category": "Debugger",
+            "title": "Autostart main",
+            "settingName": "autoStartMain",
+            "settingType": "boolean",
+            "defaultValue": true
+        },
+        {
+            "type": "setting",
+            "category": "Debugger",
+            "title": "Blackbox anything outside working directory",
+            "settingName": "blackboxAnythingOutsideCwd",
+            "settingType": "boolean",
+            "defaultValue": true
+        }
+    ],
+    "dependencies": ["common", "sdk"],
+    "scripts": [
+        "NdbMain.js"
+    ]
+}

@@ -1,0 +1,42 @@
+{
+  "extensions": [
+      {
+          "type": "view",
+          "category": "NDB",
+          "id": "ndb.runView",
+          "title": "Run configuration",
+          "persistence": "permanent",
+          "location": "run-view-sidebar",
+          "className": "Ndb.RunConfiguration"
+      },
+      {
+          "type": "view",
+          "location": "drawer-view",
+          "id": "ndb.terminal",
+          "title": "Terminal",
+          "persistence": "permanent",
+          "order": 1,
+          "className": "Ndb.Terminal"
+      },
+      {
+          "type": "view",
+          "id": "ndb.runningProcesses",
+          "title": "Node processes",
+          "persistence": "permanent",
+          "className": "Ndb.NodeProcesses"
+      }
+  ],
+  "dependencies": ["ui", "sources"],
+  "scripts": [
+      "RunConfiguration.js",
+      "NodeProcesses.js",
+      "../node_modules/xterm/dist/xterm.js",
+      "../node_modules/xterm/dist/addons/fit/fit.js",
+      "Terminal.js"
+  ],
+  "resources": [
+      "runConfiguration.css",
+      "nodeProcesses.css",
+      "../node_modules/xterm/dist/xterm.css"
+  ]
+}
