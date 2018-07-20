@@ -67,7 +67,7 @@ class FileSystemEntry {
       return this;
     const path = this.fullPath.split('/');
     const fullPath = path.slice(0, path.length - 1).join('/');
-    return new FileSystemEntry(this.filesystem, fullPath || '/', true);
+    successCallback(new FileSystemEntry(this.filesystem, fullPath || '/', true));
   }
 
   moveTo(newParent, newName, successCallback, errorCallback) {
