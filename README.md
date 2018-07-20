@@ -58,6 +58,7 @@ ndb .
 ```
 
 - Run any node command from within ndb's integrated terminal and ndb will connect automatically
+- Run any open script source by using 'Run this script' context menu item, ndb will connect automatically as well
 
 ## What can I do?
 
