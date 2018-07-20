@@ -6,7 +6,7 @@
 
 <img src="https://raw.githubusercontent.com/ChromeDevTools/devtools-logo/master/192.png" height="200" align="right">
 
-> ndb is improved debugging experience for Node.js, enabled by Chrome DevTools
+> ndb is an improved debugging experience for Node.js, enabled by Chrome DevTools
 
 ## Installation
 
