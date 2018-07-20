@@ -13,7 +13,7 @@
   },
   "scripts": {
     "lint": "./node_modules/.bin/eslint .",
-    "install": "node install.js",
+    "postinstall": "node install.js",
     "dummyScriptForTest": "node -e 'console.log(239)'",
     "unit": "./node_modules/mocha/bin/mocha test/test.js"
   },

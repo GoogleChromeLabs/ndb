@@ -20,7 +20,8 @@ const DEVTOOLS_DIR = path.dirname(
 
   new ReleaseBuilder([
     path.join(__dirname, 'front_end'),
+    DEVTOOLS_DIR,
     __dirname,
-    DEVTOOLS_DIR ],
-  outputPath).buildApp('ndb_app');
+    path.join(__dirname, '..', '..')
+  ], outputPath).buildApp('ndb_app');
 })();
