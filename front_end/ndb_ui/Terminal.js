@@ -45,8 +45,22 @@ Ndb.Terminal = class extends UI.VBox {
   wasShown() {
     if (this._terminalShownCallback) {
       this._terminal = new Terminal();
-      const terminalChild = this.contentElement.createChild();
-      this._terminal.open(terminalChild);
+
+      let fontFamily;
+      let fontSize = 11;
+      if (Host.isMac()) {
+        fontFamily = 'Menlo, monospace'
+      } else if (Host.isWin()) {
+        fontFamily = 'Consolas, Lucida Console, Courier New, monospace';
+        fontSize = 12;
+      } else {
+        fontFamily = 'dejavu sans mono, monospace';
+      }
+      this._terminal.setOption('fontFamily', fontFamily);
+      this._terminal.setOption('fontSize', fontSize);
+      this._terminal.setOption('cursorStyle', 'bar');
+
+      this._terminal.open(this.contentElement);
       this._terminalShownCallback(this._terminal);
       delete this._terminalShownCallback;
     }
