@@ -4,7 +4,7 @@
           "type": "view",
           "category": "NDB",
           "id": "ndb.runView",
-          "title": "Run configuration",
+          "title": "NPM Scripts",
           "persistence": "permanent",
           "location": "run-view-sidebar",
           "className": "Ndb.RunConfiguration"
