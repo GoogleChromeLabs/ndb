@@ -34,7 +34,8 @@ updateNotifier({pkg: require('./package.json')}).notify();
     userDataDir: await setupUserDataDir(configDir),
     args: [
       '--app=data:text/html,<style>html{background:#242424;}</style>',
-      '--enable-features=NetworkService'
+      '--enable-features=NetworkService',
+      '--no-sandbox'
     ]
   });
 
