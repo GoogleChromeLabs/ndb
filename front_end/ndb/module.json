@@ -35,6 +35,13 @@
             "settingName": "blackboxAnythingOutsideCwd",
             "settingType": "boolean",
             "defaultValue": true
+        },
+        {
+            "type": "@UI.ContextMenu.Provider",
+            "contextTypes": [
+                "Workspace.UISourceCode"
+            ],
+            "className": "Ndb.ContextMenuProvider"
         }
     ],
     "dependencies": ["common", "sdk"],
