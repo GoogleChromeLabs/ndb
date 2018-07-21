@@ -64,6 +64,31 @@ Ndb.mainConfiguration = () => {
   };
 };
 
+/**
+ * @implements {UI.ContextMenu.Provider}
+ * @unrestricted
+ */
+Ndb.ContextMenuProvider = class {
+  /**
+   * @override
+   * @param {!Event} event
+   * @param {!UI.ContextMenu} contextMenu
+   * @param {!Object} object
+   */
+  appendApplicableItems(event, contextMenu, object) {
+    if (!object instanceof Workspace.UISourceCode)
+      return;
+    const url = object.url();
+    if (!url.startsWith('file://') || !url.endsWith('.js'))
+      return;
+    contextMenu.debugSection().appendItem(ls`Run this script`, async () => {
+      const platformPath = Common.ParsedURL.urlToPlatformPath(url, Host.isWin());
+      const processManager = await Ndb.NodeProcessManager.instance();
+      processManager.run(NdbProcessInfo.execPath, [platformPath]);
+    });
+  }
+};
+
 Ndb.ServiceManager = class {
   constructor() {
     this._runningServices = new Map();
