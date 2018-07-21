@@ -239,6 +239,12 @@ Ndb.NodeProcessManager = class extends Common.Object {
 
     instance.setTarget(target);
     this.dispatchEventToListeners(Ndb.NodeProcessManager.Events.Attached, instance);
+    if (instance.isRepl()) {
+      const message =
+        new Common.Console.Message('\u001b[97mWelcome to the ndb \u001b\[92mR\u001b\[33mE\u001b\[31mP\u001b\[39mL\u001b[97m!', Common.Console.MessageLevel.Info, 1, false);
+      Common.console._messages.push(message);
+      Common.console.dispatchEventToListeners(Common.Console.Events.MessageAdded, message);
+    }
   }
 
   _shouldPauseAtStart(instance) {
@@ -405,138 +411,6 @@ Ndb.NodeProcess = class {
 SDK.DebuggerModel.prototype.scheduleStepIntoAsync = function() {
   this._agent.scheduleStepIntoAsync();
   this._agent.invoke_stepInto({breakOnAsyncCall: true});
-};
-
-// Temporary hack until frontend fix is rolled:
-// https://chromium-review.googlesource.com/c/chromium/src/+/1132630
-String.tokenizeFormatString = function(format, formatters) {
-  const tokens = [];
-
-  function addStringToken(str) {
-    if (!str)
-      return;
-    if (tokens.length && tokens[tokens.length - 1].type === 'string')
-      tokens[tokens.length - 1].value += str;
-    else
-      tokens.push({type: 'string', value: str});
-  }
-
-  function addSpecifierToken(specifier, precision, substitutionIndex) {
-    tokens.push({type: 'specifier', specifier: specifier, precision: precision, substitutionIndex: substitutionIndex});
-  }
-
-  function addAnsiColor(code) {
-    const types = {3: 'color', 9: 'colorLight', 4: 'bgColor', 10: 'bgColorLight'};
-    const colorCodes = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'lightGray', '', 'default'];
-    const colorCodesLight =
-        ['darkGray', 'lightRed', 'lightGreen', 'lightYellow', 'lightBlue', 'lightMagenta', 'lightCyan', 'white', ''];
-    const colors = {color: colorCodes, colorLight: colorCodesLight, bgColor: colorCodes, bgColorLight: colorCodesLight};
-    const type = types[Math.floor(code / 10)];
-    if (!type)
-      return;
-    const color = colors[type][code % 10];
-    if (!color)
-      return;
-    tokens.push({
-      type: 'specifier',
-      specifier: 'c',
-      value: {description: (type.startsWith('bg') ? 'background : ' : 'color: ') + color}
-    });
-  }
-
-  let textStart = 0;
-  let substitutionIndex = 0;
-  const re =
-      new RegExp(`%%|%(?:(\\d+)\\$)?(?:\\.(\\d*))?([${Object.keys(formatters).join('')}])|\\u001b\\[(\\d+)m`, 'g');
-  for (let match = re.exec(format); !!match; match = re.exec(format)) {
-    const matchStart = match.index;
-    if (matchStart > textStart)
-      addStringToken(format.substring(textStart, matchStart));
-
-    if (match[0] === '%%') {
-      addStringToken('%');
-    } else if (match[0].startsWith('%')) {
-      // eslint-disable-next-line no-unused-vars
-      const [_, substitionString, precisionString, specifierString] = match;
-      if (substitionString && Number(substitionString) > 0)
-        substitutionIndex = Number(substitionString) - 1;
-      const precision = precisionString ? Number(precisionString) : -1;
-      addSpecifierToken(specifierString, precision, substitutionIndex);
-      ++substitutionIndex;
-    } else {
-      const code = Number(match[4]);
-      addAnsiColor(code);
-    }
-    textStart = matchStart + match[0].length;
-  }
-  addStringToken(format.substring(textStart));
-  return tokens;
-};
-
-String.format = function(format, substitutions, formatters, initialValue, append, tokenizedFormat) {
-  if (!format || ((!substitutions || !substitutions.length) && format.search(/\u001b\[(\d+)m/) === -1))
-    return {formattedResult: append(initialValue, format), unusedSubstitutions: substitutions};
-
-  function prettyFunctionName() {
-    return 'String.format("' + format + '", "' + Array.prototype.join.call(substitutions, '", "') + '")';
-  }
-
-  function warn(msg) {
-    console.warn(prettyFunctionName() + ': ' + msg);
-  }
-
-  function error(msg) {
-    console.error(prettyFunctionName() + ': ' + msg);
-  }
-
-  let result = initialValue;
-  const tokens = tokenizedFormat || String.tokenizeFormatString(format, formatters);
-  const usedSubstitutionIndexes = {};
-
-  for (let i = 0; i < tokens.length; ++i) {
-    const token = tokens[i];
-
-    if (token.type === 'string') {
-      result = append(result, token.value);
-      continue;
-    }
-
-    if (token.type !== 'specifier') {
-      error('Unknown token type "' + token.type + '" found.');
-      continue;
-    }
-
-    if (!token.value && token.substitutionIndex >= substitutions.length) {
-      // If there are not enough substitutions for the current substitutionIndex
-      // just output the format specifier literally and move on.
-      error(
-          'not enough substitution arguments. Had ' + substitutions.length + ' but needed ' +
-          (token.substitutionIndex + 1) + ', so substitution was skipped.');
-      result = append(result, '%' + (token.precision > -1 ? token.precision : '') + token.specifier);
-      continue;
-    }
-
-    if (!token.value)
-      usedSubstitutionIndexes[token.substitutionIndex] = true;
-
-    if (!(token.specifier in formatters)) {
-      // Encountered an unsupported format character, treat as a string.
-      warn('unsupported format character \u201C' + token.specifier + '\u201D. Treating as a string.');
-      result = append(result, token.value ? '' : substitutions[token.substitutionIndex]);
-      continue;
-    }
-
-    result = append(result, formatters[token.specifier](token.value || substitutions[token.substitutionIndex], token));
-  }
-
-  const unusedSubstitutions = [];
-  for (let i = 0; i < substitutions.length; ++i) {
-    if (i in usedSubstitutionIndexes)
-      continue;
-    unusedSubstitutions.push(substitutions[i]);
-  }
-
-  return {formattedResult: result, unusedSubstitutions: unusedSubstitutions};
 };
 
 // Temporary hack until frontend with fix is rolled.
