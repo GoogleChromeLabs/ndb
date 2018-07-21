@@ -15,6 +15,7 @@ Ndb.NdbMain = class extends Common.Object {
     InspectorFrontendAPI.setUseSoftMenu(true);
     document.title = 'ndb';
     Ndb.NodeProcessManager.instance().then(instance => {
+      instance.repl();
       if (!Common.moduleSetting('autoStartMain').get())
         return;
       const main = Ndb.mainConfiguration();
@@ -291,6 +292,15 @@ Ndb.NodeProcessManager = class extends Common.Object {
     return this._nddService.call('run', {
       execPath, args, options: {
         waitAtStart: true
+      }
+    });
+  }
+
+  repl() {
+    return this._nddService.call('run', {
+      execPath: NdbProcessInfo.execPath, args: [], options: {
+        repl: true,
+        waitAtStart: false
       }
     });
   }
