@@ -15,6 +15,7 @@ Ndb.NdbMain = class extends Common.Object {
     InspectorFrontendAPI.setUseSoftMenu(true);
     document.title = 'ndb';
     Ndb.NodeProcessManager.instance().then(instance => {
+      instance.run(NdbProcessInfo.execPath, [NdbProcessInfo.repl]);
       if (!Common.moduleSetting('autoStartMain').get())
         return;
       const main = Ndb.mainConfiguration();
@@ -76,12 +77,12 @@ Ndb.ContextMenuProvider = class {
    * @param {!Object} object
    */
   appendApplicableItems(event, contextMenu, object) {
-    if (!object instanceof Workspace.UISourceCode)
+    if (!(object instanceof Workspace.UISourceCode))
       return;
     const url = object.url();
     if (!url.startsWith('file://') || !url.endsWith('.js'))
       return;
-    contextMenu.debugSection().appendItem(ls`Run this script`, async () => {
+    contextMenu.debugSection().appendItem(ls`Run this script`, async() => {
       const platformPath = Common.ParsedURL.urlToPlatformPath(url, Host.isWin());
       const processManager = await Ndb.NodeProcessManager.instance();
       processManager.run(NdbProcessInfo.execPath, [platformPath]);
@@ -245,7 +246,8 @@ Ndb.NodeProcessManager = class extends Common.Object {
       return false;
     if (Common.moduleSetting('blackboxAnythingOutsideCwd').get()) {
       const [_, arg] = instance.argv();
-      if (arg && (arg.endsWith('/bin/npm') || arg.endsWith('\\bin\\npm') ||
+      if (arg && (arg === NdbProcessInfo.repl ||
+          arg.endsWith('/bin/npm') || arg.endsWith('\\bin\\npm') ||
           arg.endsWith('/bin/yarn') || arg.endsWith('\\bin\\yarn') ||
           arg.endsWith('/bin/npm-cli.js') || arg.endsWith('\\bin\\npm-cli.js')))
         return false;
@@ -393,6 +395,11 @@ Ndb.NodeProcess = class {
   setTarget(target) {
     this._target = target;
   }
+
+  isRepl() {
+    return this._argv.length === 2 && this._argv[0] === NdbProcessInfo.execPath &&
+        this._argv[1] === NdbProcessInfo.repl;
+  }
 };
 
 SDK.DebuggerModel.prototype.scheduleStepIntoAsync = function() {
@@ -535,7 +542,7 @@ String.format = function(format, substitutions, formatters, initialValue, append
 // Temporary hack until frontend with fix is rolled.
 // fix: TBA.
 SDK.Target.prototype.decorateLabel = function(label) {
-  if (label.startsWith('node['))
+  if (label.includes('node['))
     return this.name();
   return label;
 };

@@ -61,6 +61,8 @@ Ndb.NodeProcesses = class extends UI.VBox {
    * @param {!Ndb.NodeProcess} instance
    */
   _onProcessAdded({data: instance}) {
+    if (instance.isRepl())
+      return;
     const f = UI.Fragment.build`
       <div class=process-item>
         <div class=process-title>${instance.userFriendlyName()}</div>
