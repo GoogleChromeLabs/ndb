@@ -49,7 +49,7 @@ Ndb.Terminal = class extends UI.VBox {
       let fontFamily;
       let fontSize = 11;
       if (Host.isMac()) {
-        fontFamily = 'Menlo, monospace'
+        fontFamily = 'Menlo, monospace';
       } else if (Host.isWin()) {
         fontFamily = 'Consolas, Lucida Console, Courier New, monospace';
         fontSize = 12;

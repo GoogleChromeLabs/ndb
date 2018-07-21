@@ -64,7 +64,8 @@ updateNotifier({pkg: require('./package.json')}).notify();
       cwd: process.cwd(),
       platform: process.platform,
       title: process.title,
-      serviceDir: path.join(__dirname, 'services')
+      serviceDir: path.join(__dirname, 'services'),
+      repl: require.resolve('./lib/repl.js')
     })};`),
     frontend.setRequestInterception(true),
     frontend.exposeFunction('openInNewTab', url => require('opn')(url)),
