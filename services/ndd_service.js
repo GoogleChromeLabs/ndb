@@ -135,6 +135,11 @@ class NddService extends ServiceBase {
       NDD_STORE: this._nddStore,
       NDD_DEASYNC_JS: require.resolve('deasync')
     };
+    if (options && options.repl) {
+      args = [require.resolve('../node_debug_demon/repl.js')];
+      spawn(execPath, args, { env, stdio: 'ignore' });
+      return;
+    }
     if (options && options.waitAtStart)
       env.NDD_WAIT_AT_START = 1;
     if (options && options.groupId)
