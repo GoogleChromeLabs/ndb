@@ -28,7 +28,7 @@ Ndb.NdbMain = class extends Common.Object {
       const regexPatterns = Common.moduleSetting('skipStackFramesPattern').getAsArray()
           .filter(({pattern}) => !pattern.startsWith('^(?!(') && pattern !== `node_debug_demon[\\/]preload\\.js`);
       regexPatterns.push({pattern:
-          `^(?!(${NdbProcessInfo.cwd}|` +
+          `^(?!(${NdbProcessInfo.cwd.replace(/\\/g, '\\\\')}|` +
           `\\[eval\\]|` +
           `${Common.ParsedURL.platformPathToURL(NdbProcessInfo.cwd)}|` +
           `file:///\\[eval\\])).*\$`});
