@@ -9,6 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const puppeteer = require('puppeteer');
+const {Writable} = require('stream');
 const removeFolder = require('rimraf');
 const {URL} = require('url');
 const util = require('util');
@@ -29,8 +30,11 @@ updateNotifier({pkg: require('./package.json')}).notify();
 
 (async function main() {
   const configDir = path.join(os.homedir(), '.ndb');
+  // TODO: remove prepare/restore process streams as soon as we roll pptr with proper fix.
+  prepareProcessStreams();
   const browser = await puppeteer.launch({
     appMode: true,
+    dumpio: true,
     userDataDir: await setupUserDataDir(configDir),
     args: [
       '--app=data:text/html,<style>html{background:#242424;}</style>',
@@ -38,6 +42,7 @@ updateNotifier({pkg: require('./package.json')}).notify();
       '--no-sandbox'
     ]
   });
+  restoreProcessStreams();
 
   const [frontend] = await browser.pages();
   frontend._client.send('Emulation.setDefaultBackgroundColorOverride',
@@ -81,6 +86,26 @@ updateNotifier({pkg: require('./package.json')}).notify();
   await frontend.goto('https://ndb/ndb_app.html?experiments=true');
   await frontend.bringToFront();
 })();
+
+function redirectPipe(stdStream, devnull, src) {
+  src.unpipe(stdStream);
+  src.pipe(devnull);
+}
+
+function prepareProcessStreams() {
+  const devnull = new Writable({
+    write(chunk, encoding, callback) {
+      callback();
+    }
+  });
+  process.stderr.on('pipe', redirectPipe.bind(null, process.stderr, devnull));
+  process.stdout.on('pipe', redirectPipe.bind(null, process.stdout, devnull));
+}
+
+function restoreProcessStreams() {
+  process.stderr.removeAllListeners('pipe');
+  process.stdout.removeAllListeners('pipe');
+}
 
 async function setupUserDataDir(configDirectory) {
   if (!fs.existsSync(configDirectory))
