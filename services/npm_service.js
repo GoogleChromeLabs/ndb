@@ -17,7 +17,13 @@ class NpmService extends ServiceBase {
     return JSON.parse(result.stdout);
   }
 
+  async dispose() {
+    process.exit(0);
+  }
+
   _getMethod(method) {
+    if (method === 'dispose')
+      return this.dispose.bind(this);
     return this.call.bind(this, method);
   }
 }

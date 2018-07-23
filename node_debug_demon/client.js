@@ -30,6 +30,19 @@ class Client extends EventEmitter {
     await this._fetchExisting();
   }
 
+  async stop() {
+    const fileNames = await util.promisify(fs.readdir)(this._nddStore);
+    await Promise.all(fileNames.map(async fileName => {
+      const match = fileName.match(/([0-9]+)-ready/);
+      if (match) {
+        const [_, id] = match;
+        process.kill(id, 'SIGKILL');
+      }
+    }));
+    await this.cleanup();
+    await this.dispose();
+  }
+
   async cleanup() {
     const fileNames = await util.promisify(fs.readdir)(this._nddStore);
     await Promise.all(fileNames.map(async fileName => {
