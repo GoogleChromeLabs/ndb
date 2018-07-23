@@ -142,7 +142,7 @@ class NddService extends ServiceBase {
     if (options.doNotInheritEnv)
       spawn(execPath, args, { env, stdio: 'inherit' });
     else
-      spawn(execPath, args, { shell: os.platform() === 'win32', env: { ...process.env, ...env }, stdio: 'inherit' });
+      spawn(execPath, args, { env: { ...process.env, ...env }, stdio: 'inherit' });
   }
 
   async kill({instanceId}) {
