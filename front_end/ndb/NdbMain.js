@@ -416,7 +416,5 @@ SDK.DebuggerModel.prototype.scheduleStepIntoAsync = function() {
 // Temporary hack until frontend with fix is rolled.
 // fix: TBA.
 SDK.Target.prototype.decorateLabel = function(label) {
-  if (label.includes('node['))
-    return this.name();
-  return label;
+  return this.name();
 };
