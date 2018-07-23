@@ -73,6 +73,9 @@ updateNotifier({pkg: require('./package.json')}).notify();
       serviceDir: path.join(__dirname, 'services'),
       repl: require.resolve('./lib/repl.js')
     })};`),
+    frontend.evaluateOnNewDocument(`function callFrontend(f) {
+      ${!!process.env.NDB_DEBUG_FRONTEND ? 'setTimeout(_ => f(), 0)' : 'f()'}
+    }`),
     frontend.setRequestInterception(true),
     frontend.exposeFunction('openInNewTab', url => require('opn')(url)),
     frontend.exposeFunction('copyText', text => require('clipboardy').write(text))
