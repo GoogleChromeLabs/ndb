@@ -4,7 +4,7 @@
 [![NPM ndb package](https://img.shields.io/npm/v/ndb.svg)](https://npmjs.org/package/ndb)
 <!-- [END badges] -->
 
-<img src="https://raw.githubusercontent.com/ChromeDevTools/devtools-logo/master/192.png" height="200" align="right">
+<img src="https://user-images.githubusercontent.com/39191/43059327-c69728e2-8e00-11e8-9e97-030d9156771f.png" width="270" align="right">
 
 > ndb is an improved debugging experience for Node.js, enabled by Chrome DevTools
 
