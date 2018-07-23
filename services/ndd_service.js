@@ -53,7 +53,7 @@ class NddService extends ServiceBase {
   async stop() {
     if (!this._nddClient)
       return;
-    await this._nddClient.dispose();
+    await this._nddClient.stop();
     this._nddClient.removeListener('added', this._onAddedListener);
     this._nddClient.removeListener('finished', this._onFinishedListener);
     this._instances.clear();

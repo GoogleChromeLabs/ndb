@@ -63,8 +63,9 @@ class Services {
   }
 
   dispose() {
-    for (const [_, {service}] of this._serviceIdToService)
-      service.kill('SIGKILL');
+    return Promise.all(Array.from(this._serviceIdToService.keys()).map(serviceId => {
+      this.callNdbService(serviceId, 'dispose', {});
+    }));
   }
 
   _onServiceMessage(serviceId, {message, callbackId}) {

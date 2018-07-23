@@ -57,7 +57,7 @@ updateNotifier({pkg: require('./package.json')}).notify();
     }
   };
 
-  const [searchBackend, fileSystemBackend] = await Promise.all([
+  const [searchBackend, fileSystemBackend, services] = await Promise.all([
     SearchBackend.create(frontend),
     FileSystem.create(frontend),
     Services.create(frontend),
@@ -78,6 +78,7 @@ updateNotifier({pkg: require('./package.json')}).notify();
     frontend.exposeFunction('copyText', text => require('clipboardy').write(text))
   ]);
   fileSystemBackend.setSearchBackend(searchBackend);
+  browser.on('disconnect', services.dispose.bind(services));
   const overridesFolder = process.env.NDB_DEBUG_FRONTEND
     ? path.dirname(require.resolve('./front_end/ndb_app.json'))
     : path.dirname(require.resolve('./.local-frontend/ndb_app.js'));
