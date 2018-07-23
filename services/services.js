@@ -18,9 +18,9 @@ class Services {
 
   static async create(frontend) {
     const services = new Services((serviceId, message) => {
-      frontend.safeEvaluate(function(serviceId, message) {
-        Ndb.serviceManager.notify(serviceId, message);
-      }, serviceId, message);
+      frontend.safeEvaluate(function(serviceId, message, isDebugFrontend) {
+        callFrontend(_ => Ndb.serviceManager.notify(serviceId, message));
+      }, serviceId, message, !!process.env.NDB_DEBUG_FRONTEND);
     });
     await Promise.all([
       frontend.exposeFunction('createNdbService', services.createNdbService.bind(services)),
