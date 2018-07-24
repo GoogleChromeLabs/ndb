@@ -10,11 +10,11 @@
 
 ## Installation
 
-#### With npm
+* With npm
 ```bash
 npm install -g ndb
 ```
-#### With yarn
+* .. or with yarn
 ```bash
 yarn global add ndb
 ```
