@@ -5,9 +5,11 @@
  */
 
 let pty;
+let error;
 try {
   pty = require('node-pty-prebuilt');
 } catch (e) {
+  error = e.stack;
 }
 
 const {ServiceBase} = require('./service_base.js');
@@ -15,7 +17,7 @@ const {ServiceBase} = require('./service_base.js');
 class Terminal extends ServiceBase {
   init(params) {
     if (!pty)
-      throw new Error('There were some errors with building terminal on this platform');
+      throw {message: error};
     this._term = pty.spawn(process.platform === 'win32' ? 'cmd.exe' : 'bash', [], {
       name: 'xterm-color',
       cols: params.cols || 80,
@@ -31,6 +33,7 @@ class Terminal extends ServiceBase {
     });
 
     this._term.on('data', data => this._notify('data', {data}));
+    this._term.on('close', _ => this._notify('close'));
     return Promise.resolve({});
   }
 

@@ -126,7 +126,7 @@ Ndb.Service = class extends Common.Object {
 
   async call(method, options) {
     const {result, error} = await callNdbService(this._serviceId, method, options);
-    return error || !result ? null : result;
+    return error || !result ? {error} : result;
   }
 };
 
