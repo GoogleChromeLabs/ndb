@@ -19,27 +19,34 @@ Ndb.Terminal = class extends UI.VBox {
 
   async _init() {
     this._service = await Ndb.serviceManager.create('terminal');
-    const nddStore = await (await Ndb.NodeProcessManager.instance()).nddStore();
     await this._terminalPromise;
     this._terminal.on('resize', size => this._service.call('resize', {cols: size.cols, rows: size.rows}));
     this._terminal.on('data', data => this._service.call('write', {data: data}));
     this._service.addEventListener(Ndb.Service.Events.Notification, this._onNotification.bind(this));
-    const success = !!await this._service.call('init', {
-      cols: this._terminal.cols,
-      rows: this._terminal.rows,
-      nddStore: nddStore
-    });
-    if (!success)
-      this._showInitError();
+    this._initService();
   }
 
   _onNotification({data: {name, params}}) {
     if (name === 'data')
       this._terminal.write(params.data);
+    if (name === 'close')
+      this._initService();
   }
 
-  _showInitError() {
+  async _initService() {
+    const nddStore = await (await Ndb.NodeProcessManager.instance()).nddStore();
+    const {error} = await this._service.call('init', {
+      cols: this._terminal.cols,
+      rows: this._terminal.rows,
+      nddStore: nddStore
+    });
+    if (error)
+      this._showInitError(error);
+  }
+
+  _showInitError(error) {
     this.contentElement.removeChildren();
+    this.contentElement.createChild('div').textContent = error;
   }
 
   wasShown() {
