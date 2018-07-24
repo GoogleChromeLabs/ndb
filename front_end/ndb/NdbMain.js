@@ -49,19 +49,24 @@ Ndb.NdbMain = class extends Common.Object {
 
 Ndb.mainConfiguration = () => {
   const cmd = NdbProcessInfo.argv.slice(2);
-  let command = '';
   if (cmd.length === 0 || cmd[0] === '.')
     return null;
+  let execPath;
+  let args;
   if (cmd[0].endsWith('.js')
     || cmd[0].endsWith('.mjs')
-    || cmd[0].startsWith('-'))
-    command = 'node ' + cmd.join(' ');
-  else
-    command = cmd.join(' ');
+    || cmd[0].startsWith('-')) {
+    execPath = NdbProcessInfo.execPath;
+    args = cmd;
+  } else {
+    execPath = cmd[0];
+    args = cmd.slice(1);
+  }
   return {
     name: 'main',
-    command: command,
-    commandToRun: command
+    command: cmd.join(' '),
+    execPath,
+    args
   };
 };
 
