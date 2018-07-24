@@ -7,7 +7,7 @@
 let pty;
 let error;
 try {
-  pty = require('node-pty-prebuilt');
+  pty = require('ndb-node-pty-prebuilt');
 } catch (e) {
   error = e.stack;
 }
@@ -35,6 +35,10 @@ class Terminal extends ServiceBase {
     this._term.on('data', data => this._notify('data', {data}));
     this._term.on('close', _ => this._notify('close'));
     return Promise.resolve({});
+  }
+
+  dispose() {
+    process.exit(0);
   }
 
   resize(params) {
