@@ -59,7 +59,7 @@ class ReleaseBuilder {
           const descriptor = JSON.parse(await fsReadFile(fullName));
           return {
             ...descriptor,
-            ...module
+            ...modulendb/install.js
           };
         })));
 
