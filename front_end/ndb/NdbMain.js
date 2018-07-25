@@ -14,16 +14,6 @@ Ndb.NdbMain = class extends Common.Object {
   run() {
     InspectorFrontendAPI.setUseSoftMenu(true);
     document.title = 'ndb';
-    Ndb.NodeProcessManager.instance().then(instance => {
-      instance.debug(NdbProcessInfo.execPath, [NdbProcessInfo.repl]);
-      if (!Common.moduleSetting('autoStartMain').get())
-        return;
-      const main = Ndb.mainConfiguration();
-      if (main) {
-        const [execPath, ...args] = main.commandToRun.split(' ');
-        instance.debug(execPath, args);
-      }
-    });
     if (Common.moduleSetting('blackboxAnythingOutsideCwd').get()) {
       const regexPatterns = Common.moduleSetting('skipStackFramesPattern').getAsArray()
           .filter(({pattern}) => !pattern.startsWith('^(?!(') && pattern !== `node_debug_demon[\\/]preload\\.js`);
