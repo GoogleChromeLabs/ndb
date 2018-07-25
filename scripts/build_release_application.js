@@ -26,7 +26,7 @@ function minify(code) {
 
 async function write(stream, data) {
   let callback;
-  let promise = new Promise(resolve => callback = resolve);
+  const promise = new Promise(resolve => callback = resolve);
   const success = stream.write(data, 'utf8', callback);
   if (!success)
     await new Promise(resolve => stream.once('drain', resolve));
