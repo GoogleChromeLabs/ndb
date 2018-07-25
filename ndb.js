@@ -64,6 +64,7 @@ updateNotifier({pkg: require('./package.json')}).notify();
     NdbPreferences.create(frontend, configDir),
     frontend.evaluateOnNewDocument(`NdbProcessInfo = ${JSON.stringify({
       execPath: process.execPath,
+      npmExecPath: process.execPath.replace(/node$/, 'npm').replace(/node\.exe$/, 'npm.cmd'),
       argv: process.argv,
       execArgv: process.execArgv,
       argv0: process.argv0,
