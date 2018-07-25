@@ -15,13 +15,13 @@ Ndb.NdbMain = class extends Common.Object {
     InspectorFrontendAPI.setUseSoftMenu(true);
     document.title = 'ndb';
     Ndb.NodeProcessManager.instance().then(instance => {
-      instance.run(NdbProcessInfo.execPath, [NdbProcessInfo.repl]);
+      instance.debug(NdbProcessInfo.execPath, [NdbProcessInfo.repl]);
       if (!Common.moduleSetting('autoStartMain').get())
         return;
       const main = Ndb.mainConfiguration();
       if (main) {
         const [execPath, ...args] = main.commandToRun.split(' ');
-        instance.run(execPath, args);
+        instance.debug(execPath, args);
       }
     });
     if (Common.moduleSetting('blackboxAnythingOutsideCwd').get()) {
@@ -35,7 +35,7 @@ Ndb.NdbMain = class extends Common.Object {
       regexPatterns.push({pattern: `node_debug_demon[\\/]preload\\.js`});
       Common.moduleSetting('skipStackFramesPattern').setAsArray(regexPatterns);
     }
-
+    this._startRepl();
     registerFileSystem('cwd', NdbProcessInfo.cwd).then(_ => {
       InspectorFrontendAPI.fileSystemAdded(undefined, {
         fileSystemName: 'cwd',
@@ -44,6 +44,12 @@ Ndb.NdbMain = class extends Common.Object {
         type: ''
       });
     });
+  }
+
+  async _startRepl() {
+    const processManager = await Ndb.NodeProcessManager.instance();
+    processManager.debug(NdbProcessInfo.execPath, [NdbProcessInfo.repl])
+        .then(this._startRepl.bind(this));
   }
 };
 
@@ -90,7 +96,7 @@ Ndb.ContextMenuProvider = class {
     contextMenu.debugSection().appendItem(ls`Run this script`, async() => {
       const platformPath = Common.ParsedURL.urlToPlatformPath(url, Host.isWin());
       const processManager = await Ndb.NodeProcessManager.instance();
-      processManager.run(NdbProcessInfo.execPath, [platformPath]);
+      processManager.debug(NdbProcessInfo.execPath, [platformPath]);
     });
   }
 };
@@ -244,7 +250,8 @@ Ndb.NodeProcessManager = class extends Common.Object {
 
     instance.setTarget(target);
     this.dispatchEventToListeners(Ndb.NodeProcessManager.Events.Attached, instance);
-    if (instance.isRepl()) {
+    if (instance.isRepl() && !self._replMessageShown) {
+      self._replMessageShown = true;
       const message =
         new Common.Console.Message('\u001b[97mWelcome to the ndb \u001b\[92mR\u001b\[33mE\u001b\[31mP\u001b\[39mL\u001b[97m!', Common.Console.MessageLevel.Info, 1, false);
       Common.console._messages.push(message);
@@ -300,10 +307,19 @@ Ndb.NodeProcessManager = class extends Common.Object {
     }
   }
 
+  debug(execPath, args) {
+    return this._nddService.call('debug', {
+      execPath, args, options: {
+        waitAtStart: true,
+        cwd: NdbProcessInfo.cwd
+      }
+    });
+  }
+
   run(execPath, args) {
     return this._nddService.call('run', {
       execPath, args, options: {
-        waitAtStart: true
+        cwd: NdbProcessInfo.cwd
       }
     });
   }
