@@ -13,6 +13,13 @@ Sources.SourcesPanel.instance()._showThreadsIfNeeded = function() {
   }
 };
 Sources.SourcesPanel.instance()._showThreadsIfNeeded();
+Ndb.NodeProcessManager.instance().then(instance => {
+  if (!Common.moduleSetting('autoStartMain').get())
+    return;
+  const main = Ndb.mainConfiguration();
+  if (main)
+    instance.debug(main.execPath, main.args);
+});
 
 UI.context.addFlavorChangeListener(SDK.DebuggerPausedDetails, _ => {
   const details = UI.context.flavor(SDK.DebuggerPausedDetails);

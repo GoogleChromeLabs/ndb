@@ -98,9 +98,14 @@ class ReleaseBuilder {
       this._buildHtml(app),
       this._buildAppScript(app),
       this._buildDynamicScripts(app),
+    ]);
+    if (fs.copyFile) {
       util.promisify(fs.copyFile)(this._lookupFile('favicon.ico'),
           path.join(this._output, 'favicon.ico'))
-    ]);
+    } else {
+      require('fs-copy-file-sync')(this._lookupFile('favicon.ico'),
+          path.join(this._output, 'favicon.ico'));
+    }
   }
 
   _topologicalSort(modules) {
