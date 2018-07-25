@@ -24,6 +24,7 @@
     "chrome-devtools-frontend": "1.0.576743",
     "clipboardy": "^1.2.3",
     "deasync": "^0.1.13",
+    "fs-copy-file-sync": "^1.1.1",
     "isbinaryfile": "^3.0.2",
     "mime": "^2.3.1",
     "opn": "^5.3.0",
