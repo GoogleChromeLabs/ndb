@@ -1,6 +1,6 @@
 {
   "name": "ndb",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Chrome DevTools for Node.js",
   "main": "ndb.js",
   "repository": "github:GoogleChromeLabs/ndb",
@@ -15,7 +15,8 @@
     "lint": "./node_modules/.bin/eslint .",
     "postinstall": "node install.js",
     "dummyScriptForTest": "node -e 'console.log(239)'",
-    "unit": "./node_modules/mocha/bin/mocha test/test.js"
+    "unit": "./node_modules/mocha/bin/mocha test/test.js",
+    "integration": "node test/integration.js"
   },
   "author": "The Chromium Authors",
   "license": "Apache-2.0",
@@ -26,7 +27,7 @@
     "isbinaryfile": "^3.0.2",
     "mime": "^2.3.1",
     "opn": "^5.3.0",
-    "puppeteer": "^1.6.0",
+    "puppeteer": "1.6.1",
     "rimraf": "^2.6.2",
     "uglify-es": "^3.3.10",
     "update-notifier": "^2.5.0",
