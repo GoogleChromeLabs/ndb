@@ -15,7 +15,8 @@
     "lint": "./node_modules/.bin/eslint .",
     "postinstall": "node install.js",
     "dummyScriptForTest": "node -e 'console.log(239)'",
-    "unit": "./node_modules/mocha/bin/mocha test/test.js"
+    "unit": "./node_modules/mocha/bin/mocha test/test.js",
+    "integration": "node test/integration.js"
   },
   "author": "The Chromium Authors",
   "license": "Apache-2.0",

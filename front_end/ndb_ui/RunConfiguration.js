@@ -15,18 +15,24 @@ Ndb.RunConfiguration = class extends UI.VBox {
   }
 
   async update() {
-    const service = await Ndb.serviceManager.create('npm_service');
-    const scripts = await service.call('run', {});
-    const configurations = [];
-    const main = Ndb.mainConfiguration();
-    if (main)
-      configurations.push(main);
-    this._items.replaceAll(configurations.concat(Object.keys(scripts).map(name => ({
-      name,
-      command: scripts[name],
-      execPath: NdbProcessInfo.npmExecPath,
-      args: ['run', name]
-    }))));
+    const manager = await Ndb.NodeProcessManager.instance();
+    const result = await manager.run(NdbProcessInfo.npmExecPath, ['--json', 'run']);
+    if (result.code !== 0 || result.stderr)
+      return;
+    try {
+      const scripts = JSON.parse(result.stdout);
+      const configurations = [];
+      const main = Ndb.mainConfiguration();
+      if (main)
+        configurations.push(main);
+      this._items.replaceAll(configurations.concat(Object.keys(scripts).map(name => ({
+        name,
+        command: scripts[name],
+        execPath: NdbProcessInfo.npmExecPath,
+        args: ['run', name]
+      }))));
+    } catch (e) {
+    }
   }
 
   /**
@@ -56,7 +62,7 @@ Ndb.RunConfiguration = class extends UI.VBox {
 
   async _runConfig(execPath, args) {
     const manager = await Ndb.NodeProcessManager.instance();
-    await manager.run(execPath, args);
+    await manager.debug(execPath, args);
   }
 
   /**

@@ -12,7 +12,12 @@
   InspectorFrontendHost.stopIndexing = stopIndexing;
   InspectorFrontendHost.searchInPath = searchInPath;
   InspectorFrontendHost.isolatedFileSystem = name => new self.FileSystem(name);
-  InspectorFrontendHost.getPreferences = f => getPreferences().then(p => f(p));
+  InspectorFrontendHost.getPreferences = f => {
+    const threads = runtime._extensions.find(e => e._descriptor.className === 'Sources.ThreadsSidebarPane');
+    threads._descriptor.className = 'UI.Widget';
+    threads._descriptor.title = 'Node processes';
+    getPreferences().then(p => f(p));
+  };
   InspectorFrontendHost.setPreference = setPreference;
   InspectorFrontendHost.removePreference = removePreference;
   InspectorFrontendHost.clearPreferences = clearPreferences;
