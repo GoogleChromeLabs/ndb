@@ -10,9 +10,15 @@
 
 ## Installation
 
+* With npm
 ```bash
 npm install -g ndb
 ```
+* .. or with yarn
+```bash
+yarn global add ndb
+```
+
 Compatibility: ndb requires Node >=8.0.0. It works best with Node >=10.
 
 Installation: ndb depends on [Puppeteer](https://github.com/GoogleChrome/puppeteer) which downloads a recent version of Chromium (~170MB Mac, ~280MB Linux, ~280MB Win).
