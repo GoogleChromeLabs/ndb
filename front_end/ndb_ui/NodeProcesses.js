@@ -29,6 +29,7 @@ Ndb.NodeProcesses = class extends UI.VBox {
     this._pauseAtStartCheckbox = new UI.ToolbarSettingCheckbox(
         Common.moduleSetting('pauseAtStart'), Common.UIString('Pause at start'),
         Common.UIString('Pause at start'));
+    this._pauseAtStartCheckbox.element.id = 'pause-at-start-checkbox';
     toolbar.appendToolbarItem(this._pauseAtStartCheckbox);
     this._waitAtEndCheckbox = new UI.ToolbarSettingCheckbox(
         Common.moduleSetting('waitAtEnd'), Common.UIString('Wait for manual disconnect'),
@@ -36,6 +37,7 @@ Ndb.NodeProcesses = class extends UI.VBox {
     toolbar.appendToolbarItem(this._waitAtEndCheckbox);
 
     this._emptyElement = this.contentElement.createChild('div', 'gray-info-message');
+    this._emptyElement.id = 'no-running-nodes-msg';
     this._emptyElement.textContent = Common.UIString('No running nodes');
 
     this._treeOutline = new UI.TreeOutlineInShadow();

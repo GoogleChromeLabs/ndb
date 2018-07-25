@@ -123,13 +123,7 @@ class NddService extends ServiceBase {
     instance[wsSymbol].send(message);
   }
 
-  async run({execPath, args, options}) {
-    if (this._nddStore !== process.env.NDD_STORE) {
-      options = {
-        waitAtStart: false,
-        ...options
-      };
-    }
+  async debug({execPath, args, options}) {
     const env = {
       NODE_OPTIONS: `--require ${require.resolve('../node_debug_demon/preload.js')} --inspect=0`,
       NDD_STORE: this._nddStore,
@@ -139,10 +133,32 @@ class NddService extends ServiceBase {
       env.NDD_WAIT_AT_START = 1;
     if (options && options.groupId)
       env.NDD_GROUP_ID = options.groupId;
-    if (options.doNotInheritEnv)
-      spawn(execPath, args, { env, stdio: 'inherit' });
-    else
-      spawn(execPath, args, { env: { ...process.env, ...env }, stdio: 'inherit' });
+    const p = spawn(execPath, args, {
+      cwd: options.cwd,
+      env: { ...process.env, ...env },
+      stdio: 'inherit'
+    });
+    return new Promise((resolve, reject) => {
+      p.on('exit', code => resolve(code));
+      p.on('error', error => reject(error));
+    });
+  }
+
+  run({execPath, args, options}) {
+    const env = options.env || {};
+    let stdoutString = '';
+    let stderrString = '';
+    const p = spawn(execPath, args, { cwd: options.cwd, env: { ...process.env, ...env }});
+    p.stdout.on('data', data => stdoutString += data.toString());
+    p.stderr.on('data', data => stderrString += data.toString());
+    return new Promise((resolve, reject) => {
+      p.on('exit', code => resolve({
+        stdout: stdoutString,
+        stderr: stderrString,
+        code
+      }));
+      p.on('error', error => reject(error));
+    });
   }
 
   async kill({instanceId}) {
