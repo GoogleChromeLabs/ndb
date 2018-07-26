@@ -33,7 +33,7 @@ Ndb.NodeModulesBlackboxing = class extends UI.VBox {
   async _update() {
     const processManager = await Ndb.NodeProcessManager.instance();
     const {error, code, stderror, stdout} = await processManager.run(NdbProcessInfo.npmExecPath, ['ls', '--depth=0', '--json']);
-    if (error || code !== 0 || stderror)
+    if (!stdout || stdout.length === 0)
       return;
     let dependencies;
     try {

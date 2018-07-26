@@ -50,7 +50,7 @@
             "className": "Ndb.ContextMenuProvider"
         }
     ],
-    "dependencies": ["common", "sdk"],
+    "dependencies": ["common", "sdk", "bindings"],
     "scripts": [
         "NdbMain.js"
     ]
