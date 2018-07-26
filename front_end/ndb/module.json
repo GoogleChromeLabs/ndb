@@ -14,6 +14,12 @@
         },
         {
             "type": "setting",
+            "settingName": "whitelistedModules",
+            "settingType": "string",
+            "defaultValue": ""
+        },
+        {
+            "type": "setting",
             "category": "Debugger",
             "title": "Wait at end",
             "settingName": "waitAtEnd",

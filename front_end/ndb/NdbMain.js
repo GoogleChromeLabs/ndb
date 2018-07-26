@@ -14,17 +14,9 @@ Ndb.NdbMain = class extends Common.Object {
   run() {
     InspectorFrontendAPI.setUseSoftMenu(true);
     document.title = 'ndb';
-    if (Common.moduleSetting('blackboxAnythingOutsideCwd').get()) {
-      const regexPatterns = Common.moduleSetting('skipStackFramesPattern').getAsArray()
-          .filter(({pattern}) => !pattern.startsWith('^(?!(') && pattern !== `node_debug_demon[\\/]preload\\.js`);
-      regexPatterns.push({pattern:
-          `^(?!(${NdbProcessInfo.cwd.replace(/\\/g, '\\\\')}|` +
-          `\\[eval\\]|` +
-          `${Common.ParsedURL.platformPathToURL(NdbProcessInfo.cwd)}|` +
-          `file:///\\[eval\\])).*\$`});
-      regexPatterns.push({pattern: `node_debug_demon[\\/]preload\\.js`});
-      Common.moduleSetting('skipStackFramesPattern').setAsArray(regexPatterns);
-    }
+    Common.moduleSetting('blackboxAnythingOutsideCwd').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
+    Common.moduleSetting('whitelistedModules').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
+    Ndb.NdbMain._calculateBlackboxState();
     this._startRepl();
     registerFileSystem('cwd', NdbProcessInfo.cwd).then(_ => {
       InspectorFrontendAPI.fileSystemAdded(undefined, {
@@ -40,6 +32,35 @@ Ndb.NdbMain = class extends Common.Object {
     const processManager = await Ndb.NodeProcessManager.instance();
     processManager.debug(NdbProcessInfo.execPath, [NdbProcessInfo.repl])
         .then(this._startRepl.bind(this));
+  }
+
+  static _calculateBlackboxState() {
+    const whitelistOnlyProject = Common.moduleSetting('blackboxAnythingOutsideCwd').get();
+    const whitelistModules = Common.moduleSetting('whitelistedModules').get().split(',');
+
+    // ^(?!cwd|[eval]|f(cwd)|f([eval]))|^(cwd/node_modules/|f(cwd/node_modules/))(?!(module1|module2|...))
+    const escapedCwd = NdbProcessInfo.cwd.replace(/\\/g, '\\\\');
+    const cwdUrl = Common.ParsedURL.platformPathToURL(NdbProcessInfo.cwd);
+
+    let pattern = '';
+    if (whitelistOnlyProject)
+      pattern += `^(?!${escapedCwd}|\\[eval\\]|${cwdUrl}|file:///\\[eval\\])`;
+    pattern += `${pattern.length > 0 ? '|' : ''}^(`+
+      `${escapedCwd}[/\\\\]node_modules[/\\\\]|` +
+      `${cwdUrl}/node_modules/)${whitelistModules.length > 0 ? `(?!${whitelistModules.join('|')})` : ''}`;
+
+    const regexPatterns = Common.moduleSetting('skipStackFramesPattern').getAsArray()
+        .filter(({pattern}) => !pattern.includes(`\\[eval\\]`) && pattern !== `node_debug_demon[\\/]preload\\.js`);
+    regexPatterns.push({pattern:pattern });
+    regexPatterns.push({pattern: `node_debug_demon[\\/]preload\\.js`});
+    Common.moduleSetting('skipStackFramesPattern').setAsArray(regexPatterns);
+
+    if (whitelistModules.length > 0) {
+      const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
+      let folders = [];
+      folders.push(`/node_modules/(?!${whitelistModules.join('|')}).+`);
+      setting.set(folders.join('|'));
+    }
   }
 };
 
