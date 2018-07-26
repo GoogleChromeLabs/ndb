@@ -52,15 +52,40 @@ Ndb.NdbMain = class extends Common.Object {
 
     const regexPatterns = Common.moduleSetting('skipStackFramesPattern').getAsArray()
         .filter(({pattern}) => !pattern.includes(`\\[eval\\]`) && pattern !== `node_debug_demon[\\/]preload\\.js`);
-    regexPatterns.push({pattern:pattern });
+    regexPatterns.push({pattern: pattern });
     regexPatterns.push({pattern: `node_debug_demon[\\/]preload\\.js`});
     Common.moduleSetting('skipStackFramesPattern').setAsArray(regexPatterns);
 
     if (whitelistModules.length > 0) {
+      const root = {name: 'node_modules', subfolders: []};
+      populateFolders(whitelistModules, root);
       const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
       let folders = [];
-      folders.push(`/node_modules/(?!${whitelistModules.join('|')}).+`);
+      folders.push(`^/node_modules/(?!($|${root.subfolders.map(generatePattern).join('|')}))`);
       setting.set(folders.join('|'));
+    }
+
+    function populateFolders(folders, currentRoot) {
+      const perParent = new Map();
+      for (const folder of folders) {
+        const [parent, ...tail] = folder.split('/');
+        if (!perParent.has(parent))
+          perParent.set(parent, [tail.join('/')]);
+        else
+          perParent.get(parent).push(tail.join('/'));
+      }
+      for (const [parent, tails] of perParent) {
+        const node = {name: parent, subfolders: []};
+        if (tails.filter(a => a.length).length)
+          populateFolders(tails, node);
+        currentRoot.subfolders.push(node);
+      }
+    }
+
+    function generatePattern(node) {
+      if (!node.subfolders || !node.subfolders.length)
+        return `${node.name}/`;
+      return `${node.name}/($|${node.subfolders.map(generatePattern).join('|')})`;
     }
   }
 };
