@@ -242,8 +242,14 @@ Ndb.NodeProcessManager = class extends Common.Object {
     this.dispatchEventToListeners(Ndb.NodeProcessManager.Events.Attached, instance);
     if (instance.isRepl() && !self._replMessageShown) {
       self._replMessageShown = true;
-      const message =
-        new Common.Console.Message('\u001b[97mWelcome to the ndb \u001b\[92mR\u001b\[33mE\u001b\[31mP\u001b\[39mL\u001b[97m!', Common.Console.MessageLevel.Info, 1, false);
+      let message;
+      if (Common.moduleSetting('uiTheme').get() === 'default') {
+        message =
+          new Common.Console.Message('\u001b[30mWelcome to the ndb \u001b\[32mR\u001b\[31mE\u001b\[34mP\u001b\[90mL\u001b[30m!\u001b[0m', Common.Console.MessageLevel.Info, 1, false);
+      } else {
+        message =
+          new Common.Console.Message('\u001b[97mWelcome to the ndb \u001b\[92mR\u001b\[33mE\u001b\[31mP\u001b\[39mL\u001b[97m!\u001b[0m', Common.Console.MessageLevel.Info, 1, false);
+      }
       Common.console._messages.push(message);
       Common.console.dispatchEventToListeners(Common.Console.Events.MessageAdded, message);
     }
