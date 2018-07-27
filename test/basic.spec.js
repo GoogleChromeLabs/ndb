@@ -12,13 +12,16 @@ const removeFolder = require('rimraf');
 const util = require('util');
 
 const {launch} = require('../lib/launcher.js');
+const {ReleaseBuilder} = require('../scripts/build_release_application.js');
 
 const fsMkdtemp = util.promisify(fs.mkdtemp);
 
 module.exports.addTests = function({testRunner}) {
   // eslint-disable-next-line
+  const {beforeAll, afterAll} = testRunner;
+  // eslint-disable-next-line
   const {it, fit, xit} = testRunner;
-  it('run configuration', async function() {
+  xit('run configuration', async function() {
     const configDir = await fsMkdtemp(path.join(os.tmpdir(), 'ndb-test-'));
     const frontend = await launch({
       configDir: configDir,
@@ -41,7 +44,7 @@ module.exports.addTests = function({testRunner}) {
     await util.promisify(removeFolder)(configDir);
   });
 
-  it('run, pause at start, kill', async function() {
+  xit('run, pause at start, kill', async function() {
     const configDir = await fsMkdtemp(path.join(os.tmpdir(), 'ndb-test-'));
     const frontend = await launch({
       configDir: configDir,
@@ -78,7 +81,7 @@ module.exports.addTests = function({testRunner}) {
     await util.promisify(removeFolder)(configDir);
   });
 
-  it('terminal', async function() {
+  xit('terminal', async function() {
     const configDir = await fsMkdtemp(path.join(os.tmpdir(), 'ndb-test-'));
     const frontend = await launch({
       configDir: configDir,
@@ -121,7 +124,7 @@ module.exports.addTests = function({testRunner}) {
     await util.promisify(removeFolder)(configDir);
   });
 
-  it('terminal exit', async function() {
+  xit('terminal exit', async function() {
     const configDir = await fsMkdtemp(path.join(os.tmpdir(), 'ndb-test-'));
     const frontend = await launch({
       configDir: configDir,
@@ -155,7 +158,7 @@ module.exports.addTests = function({testRunner}) {
     await util.promisify(removeFolder)(configDir);
   });
 
-  it('repl and uncaught error', async function() {
+  xit('repl and uncaught error', async function() {
     const configDir = await fsMkdtemp(path.join(os.tmpdir(), 'ndb-test-'));
     const frontend = await launch({
       configDir: configDir,
@@ -174,8 +177,103 @@ module.exports.addTests = function({testRunner}) {
     await frontend.close();
     await util.promisify(removeFolder)(configDir);
   });
+
+  beforeAll(async function(state) {
+    const DEVTOOLS_DIR = path.dirname(
+        require.resolve('chrome-devtools-frontend/front_end/shell.json'));
+    const frontendFolder = await fsMkdtemp(path.join(os.tmpdir(), 'ndb-test-frontend-'));
+    await new ReleaseBuilder([
+      path.join(__dirname, '..', 'front_end'),
+      DEVTOOLS_DIR,
+      path.join(__dirname, '..'),
+      path.join(__dirname, '..', '..', '..')
+    ], frontendFolder).buildApp('integration_test_runner');
+    state.frontendFolder = frontendFolder;
+  });
+
+  afterAll(async function(state) {
+    return util.promisify(removeFolder)(state.frontendFolder);
+  });
+
+  fit('breakpoint inside .mjs file', async function(state) {
+    const configDir = await fsMkdtemp(path.join(os.tmpdir(), 'ndb-test-'));
+    const frontend = await launch({
+      configDir: configDir,
+      argv: ['.'],
+      cwd: path.join(__dirname, 'assets', 'test-project'),
+      debugFrontend: false,
+      doNotCopyPreferences: true,
+      appName: 'integration_test_runner',
+      releaseFrontendFolder: state.frontendFolder
+    });
+    await setupHelpers(frontend);
+    await frontend.showScriptSource('index.mjs');
+    await frontend.setBreakpoint(6, '');
+    await frontend.waitForConfigurations();
+
+    {
+      frontend.runConfiguration('run-module');
+      const {frames: [{location}]} = await frontend.waitUntilPaused();
+      assert.equal(6, location.lineNumber);
+      assert.equal(2, location.columnNumber);
+      await frontend.resumeExecution();
+    }
+
+    {
+      frontend.runConfiguration('run-module-without-flag');
+      const {frames: [{location}]} = await frontend.waitUntilPaused();
+      assert.equal(6, location.lineNumber);
+      assert.equal(2, location.columnNumber);
+      await frontend.resumeExecution();
+    }
+
+    await frontend.close();
+    await util.promisify(removeFolder)(configDir);
+  });
 };
+
 // eslint-disable-next-line
 function sleep() {
   return new Promise(resolve => setTimeout(resolve, 2147483647));
+}
+
+async function setupHelpers(frontend) {
+  await frontend.evaluate(() => self.runtime.loadModulePromise('sources_test_runner'));
+  await frontend.evaluate(_ => SourcesTestRunner.startDebuggerTest());
+  frontend.waitForConfigurations = function() {
+    return this.waitForSelector('body /deep/ div.configuration-item');
+  };
+
+  frontend.showScriptSource = function(name) {
+    return this.evaluate(name => SourcesTestRunner.showScriptSourcePromise(name), name);
+  };
+
+  frontend.setBreakpoint = function(line, condition) {
+    return this.evaluate((line, condition) => {
+      const sourcesView = Sources.SourcesPanel.instance().sourcesView();
+      const frame = sourcesView.currentSourceFrame();
+      SourcesTestRunner.setBreakpoint(frame, line, condition, true);
+    }, line, condition);
+  };
+
+  frontend.runConfiguration = async function(name) {
+    const handle = await this.evaluateHandle(name => {
+      const items = runtime.sharedInstance(Ndb.RunConfiguration).contentElement.querySelectorAll('div.list-item');
+      return Array.from(items).find(e => e.innerText.split('\n')[0] === name);
+    }, name);
+    const element = handle.asElement();
+    await element.hover();
+    const runButton = await element.$('div.controls-buttons');
+    await runButton.click();
+  };
+
+  frontend.waitUntilPaused = function() {
+    return this.evaluate(_ => new Promise(resolve => {
+      SourcesTestRunner.waitUntilPaused(frames => resolve({frames: frames.map(frame => frame._payload)}));
+    }));
+  };
+
+  frontend.resumeExecution = function() {
+    return this.evaluate(_ => new Promise(resolve => SourcesTestRunner.resumeExecution(resolve)));
+  };
 }
