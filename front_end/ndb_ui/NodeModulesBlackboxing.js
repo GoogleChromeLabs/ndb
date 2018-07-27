@@ -11,7 +11,7 @@ Ndb.NodeModulesBlackboxing = class extends UI.VBox {
   constructor() {
     super(true);
     this.registerRequiredCSS('ndb_ui/nodeModulesBlackboxing.css');
-    
+
     this.contentElement.createChild('div', 'header').textContent = ls`Node modules whitelist`;
 
     this._items = new UI.ListModel();
@@ -31,16 +31,11 @@ Ndb.NodeModulesBlackboxing = class extends UI.VBox {
   }
 
   async _update() {
-    const processManager = await Ndb.NodeProcessManager.instance();
-    const {error, code, stderror, stdout} = await processManager.run(NdbProcessInfo.npmExecPath, ['ls', '--depth=0', '--json']);
-    if (!stdout || stdout.length === 0)
+    if (!NdbProcessInfo.pkg)
       return;
-    let dependencies;
-    try {
-      dependencies = Object.keys(JSON.parse(stdout).dependencies);
-    } catch (e) {
-      return;
-    }
+    const dependencies = [
+      ...Object.keys(NdbProcessInfo.pkg.dependencies || {}),
+      ...Object.keys(NdbProcessInfo.pkg.devDependencies || {})];
     const whitelisted = new Set((Common.moduleSetting('whitelistedModules').get() || '').split(','));
     this._items.replaceAll(dependencies.map(name => ({
       name,

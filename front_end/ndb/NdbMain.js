@@ -46,7 +46,7 @@ Ndb.NdbMain = class extends Common.Object {
     let pattern = '';
     if (whitelistOnlyProject)
       pattern += `^(?!${escapedCwd}|\\[eval\\]|${cwdUrl}|file:///\\[eval\\])`;
-    pattern += `${pattern.length > 0 ? '|' : ''}^(`+
+    pattern += `${pattern.length > 0 ? '|' : ''}^(` +
       `${escapedCwd}[/\\\\]node_modules[/\\\\]|` +
       `${cwdUrl}/node_modules/)${whitelistModules.length > 0 ? `(?!${whitelistModules.join('|')})` : ''}`;
 
@@ -56,14 +56,21 @@ Ndb.NdbMain = class extends Common.Object {
     regexPatterns.push({pattern: `node_debug_demon[\\/]preload\\.js`});
     Common.moduleSetting('skipStackFramesPattern').setAsArray(regexPatterns);
 
-    if (whitelistModules.length > 0) {
-      const root = {name: 'node_modules', subfolders: []};
-      populateFolders(whitelistModules, root);
-      const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
-      let folders = [];
-      folders.push(`^/node_modules/(?!($|${root.subfolders.map(generatePattern).join('|')}))`);
-      setting.set(folders.join('|'));
+    let excludePattern;
+    if (NdbProcessInfo.pkg) {
+      if (whitelistModules.length > 0) {
+        const root = {name: 'node_modules', subfolders: []};
+        populateFolders(whitelistModules, root);
+        excludePattern = `^/node_modules/(?!($|${root.subfolders.map(generatePattern).join('|')}))`;
+      } else {
+        excludePattern = `^/node_modules/`;
+      }
+    } else {
+      excludePattern = '^/[^/]+/[^/]+/[^/]+/';
     }
+    const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
+    setting.set(excludePattern);
+    setExcludedPattern(excludePattern);
 
     function populateFolders(folders, currentRoot) {
       const perParent = new Map();
@@ -128,7 +135,7 @@ class SourceMappableState extends Bindings.BreakpointManager.Breakpoint.State {
       }
     }
   }
-};
+}
 
 Bindings.BreakpointManager.Breakpoint.State = SourceMappableState;
 
@@ -138,7 +145,7 @@ Ndb.SourceMapManager = class {
       inspectedURL: _ => Common.ParsedURL.platformPathToURL(NdbProcessInfo.cwd)
     });
     this._manager.addEventListener(
-      SDK.SourceMapManager.Events.SourceMapAttached, this._sourceMapAttached, this);
+        SDK.SourceMapManager.Events.SourceMapAttached, this._sourceMapAttached, this);
     Workspace.workspace.addEventListener(Workspace.Workspace.Events.UISourceCodeAdded, this._uiSourceCodeAdded, this);
 
     this._bindings = new Map();

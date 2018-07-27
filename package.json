@@ -21,6 +21,7 @@
   "author": "The Chromium Authors",
   "license": "Apache-2.0",
   "dependencies": {
+    "chokidar": "^2.0.4",
     "chrome-devtools-frontend": "1.0.576743",
     "clipboardy": "^1.2.3",
     "deasync": "^0.1.13",
