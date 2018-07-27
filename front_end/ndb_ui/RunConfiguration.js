@@ -15,23 +15,18 @@ Ndb.RunConfiguration = class extends UI.VBox {
   }
 
   async update() {
-    const manager = await Ndb.NodeProcessManager.instance();
-    const result = await manager.run(NdbProcessInfo.npmExecPath, ['--json', 'run']);
-    if (result.code !== 0 || result.stderr)
-      return;
-    try {
-      const scripts = JSON.parse(result.stdout);
-      const configurations = [];
-      const main = Ndb.mainConfiguration();
-      if (main)
-        configurations.push(main);
+    const configurations = [];
+    const main = Ndb.mainConfiguration();
+    if (main)
+      configurations.push(main);
+    if (NdbProcessInfo.pkg) {
+      const scripts = NdbProcessInfo.pkg.scripts || {};
       this._items.replaceAll(configurations.concat(Object.keys(scripts).map(name => ({
         name,
         command: scripts[name],
         execPath: NdbProcessInfo.npmExecPath,
         args: ['run', name]
       }))));
-    } catch (e) {
     }
   }
 

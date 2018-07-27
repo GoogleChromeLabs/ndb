@@ -41,5 +41,7 @@ launch({
   configDir: path.join(os.homedir(), '.ndb'),
   argv: process.argv,
   cwd: process.cwd(),
-  debugFrontend: !!process.env.NDB_DEBUG_FRONTEND
+  debugFrontend: !!process.env.NDB_DEBUG_FRONTEND,
+  appName: 'ndb_app',
+  releaseFrontendFolder: path.join(__dirname, '.local-frontend')
 }).then(frontend => frontend.bringToFront());
