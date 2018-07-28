@@ -1,6 +1,7 @@
 # exclude all tests
 test/
 test/fs/
+utils/testrunner
 
 # repeats from .gitignore
 /.local-frontend/

@@ -14,6 +14,7 @@ class Services {
     this._serviceIdToService = new Map();
     this._lastServiceId = 0;
     this._lastCallbackId = 0;
+    this._isDisposed = false;
   }
 
   static async create(frontend) {
@@ -63,6 +64,9 @@ class Services {
   }
 
   dispose() {
+    if (this._isDisposed)
+      return;
+    this._isDisposed = true;
     return Promise.all(Array.from(this._serviceIdToService.keys()).map(serviceId => {
       this.callNdbService(serviceId, 'dispose', {});
     }));

@@ -7,13 +7,14 @@
 try {
   const fs = require('fs');
   const path = require('path');
+
   const nddStore = process.env.NDD_STORE;
   const nddWaitAtStart = !!process.env.NDD_WAIT_AT_START || false;
   const nodePid = process.pid;
   const nddGroupId = process.env.NDD_GROUP_ID || `${nodePid}:${Date.now()}`;
   if (process.env.NDD_GROUP_ID !== nddGroupId)
     process.env.NDD_GROUP_ID = nddGroupId;
-  const parentId = process.env.NDD_PID || undefined;
+  const parentProcessId = process.env.NDD_PID;
   process.env.NDD_PID = process.pid;
 
   const stateFileName = path.join(nddStore, `${nodePid}`);
@@ -23,8 +24,8 @@ try {
     argv: process.argv.concat(process.execArgv),
     waitAtStart: nddWaitAtStart
   };
-  if (parentId)
-    state.parentId = parentId;
+  if (parentProcessId)
+    state.parentId = parentProcessId;
   fs.writeFileSync(stateFileName, JSON.stringify(state));
 
   const readyFileName = path.join(nddStore, `${nodePid}-ready`);
@@ -45,7 +46,9 @@ try {
     const buffer = [];
     const store = message => buffer.push(message);
     process.on('message', store);
-    require(process.env.NDD_DEASYNC_JS).loopWhile(() => wait);
+
+    while (wait) require(process.env.NDD_DEASYNC_JS).sleep(100);
+
     process.removeListener('message', store);
     if (buffer.length)
       setTimeout(_ => buffer.map(message => process.emit('message', message)), 0);
@@ -53,12 +56,5 @@ try {
   } else {
     fs.renameSync(stateFileName, readyFileName);
   }
-  process.on('exit', _ => {
-    try {
-      fs.unlinkSync(readyFileName);
-    } catch (e) {
-      console.log(e.stack);
-    }
-  });
 } catch (e) {
 }

@@ -22,31 +22,21 @@ class NddService extends ServiceBase {
   constructor() {
     super();
     this._nddStore = '';
-    this._useTemporaryNddStore = false;
     this._nddClient = null;
     this._onAddedListener = this._onAdded.bind(this);
     this._onFinishedListener = this._onFinished.bind(this);
 
-    this._cleanupInterval = null;
-
     this._instances = new Map();
   }
 
-  async start({nddStore, cleanupInterval}) {
+  async start() {
     if (this._nddClient)
       return;
-    this._useTemporaryNddStore = !nddStore;
-    this._nddStore = nddStore || await util.promisify(fs.mkdtemp)(path.join(os.tmpdir(), 'ndb-'));
+    this._nddStore = await util.promisify(fs.mkdtemp)(path.join(os.tmpdir(), 'ndb-'));
     this._nddClient = new Client(this._nddStore);
     this._nddClient.on('added', this._onAddedListener);
     this._nddClient.on('finished', this._onFinishedListener);
     await this._nddClient.start();
-    this._cleanupInterval = setInterval(() => this._nddClient.cleanup(), cleanupInterval || 1000);
-  }
-
-  async nddStore() {
-    if (!this._nddClient)
-      throw 'NddService should be started first';
     return this._nddStore;
   }
 
@@ -57,16 +47,15 @@ class NddService extends ServiceBase {
     this._nddClient.removeListener('added', this._onAddedListener);
     this._nddClient.removeListener('finished', this._onFinishedListener);
     this._instances.clear();
-    if (this._useTemporaryNddStore)
-      await util.promisify(removeFolder)(this._nddStore);
-
-    if (this._cleanupInterval)
-      clearInterval(this._cleanupInterval);
+    await util.promisify(removeFolder)(this._nddStore);
   }
 
   async dispose() {
-    await this.stop();
-    process.exit(0);
+    try {
+      await this.stop();
+    } finally {
+      process.exit(0);
+    }
   }
 
   async attach({instanceId}) {
@@ -88,6 +77,7 @@ class NddService extends ServiceBase {
         instanceId: instance.id()
       });
       delete instance[wsSymbol];
+      this._nddClient.detach(instance.id());
     });
     ws.on('open', _ => {
       instance[wsSymbol] = ws;
@@ -167,7 +157,7 @@ class NddService extends ServiceBase {
     const instance = this._instances.get(instanceId);
     if (!instance)
       throw 'No instance with given id';
-    await instance.kill();
+    instance.kill();
   }
 
   async _onAdded(instance) {

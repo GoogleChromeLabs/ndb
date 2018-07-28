@@ -286,7 +286,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
   static async _create() {
     const service = await Ndb.serviceManager.create('ndd_service');
     const instance = new Ndb.NodeProcessManager(SDK.targetManager, service);
-    await service.call('start');
+    instance._nddStore = await service.call('start');
     Ndb.NodeProcessManager._instanceReady(instance);
     delete Ndb.NodeProcessManager._instanceReady;
   }
@@ -329,7 +329,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
   }
 
   nddStore() {
-    return this._nddService.call('nddStore');
+    return this._nddStore;
   }
 
   _onNotification({data: {name, params}}) {
@@ -608,7 +608,7 @@ SDK.Target.prototype.decorateLabel = function(label) {
 };
 
 // Front-end does not respect modern toggle semantics, patch it.
-var originalToggle = DOMTokenList.prototype.toggle;
+const originalToggle = DOMTokenList.prototype.toggle;
 DOMTokenList.prototype.toggle = function(token, force) {
   if (arguments.length === 1)
     force = !this.contains(token);
