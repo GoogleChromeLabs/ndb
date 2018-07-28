@@ -606,3 +606,11 @@ SDK.DebuggerModel.prototype.setBreakpointByURL = async function(url, lineNumber,
 SDK.Target.prototype.decorateLabel = function(label) {
   return this.name();
 };
+
+// Front-end does not respect modern toggle semantics, patch it.
+var originalToggle = DOMTokenList.prototype.toggle;
+DOMTokenList.prototype.toggle = function(token, force) {
+  if (arguments.length === 1)
+    force = !this.contains(token);
+  return originalToggle.call(this, token, !!force);
+};
