@@ -39,8 +39,8 @@ Ndb.NodeProcesses = class extends UI.VBox {
     this._pauseAtStartCheckbox.element.id = 'pause-at-start-checkbox';
     toolbar.appendToolbarItem(this._pauseAtStartCheckbox);
     this._waitAtEndCheckbox = new UI.ToolbarSettingCheckbox(
-        Common.moduleSetting('waitAtEnd'), Common.UIString('Wait for manual disconnect'),
-        Common.UIString('Wait at end'));
+        Common.moduleSetting('waitAtEnd'), Common.UIString('Stay attached when process is finished.'),
+        Common.UIString('Stay attached'));
     toolbar.appendToolbarItem(this._waitAtEndCheckbox);
 
     this._emptyElement = this.contentElement.createChild('div', 'gray-info-message');

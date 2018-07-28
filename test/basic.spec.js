@@ -195,7 +195,7 @@ module.exports.addTests = function({testRunner}) {
     return util.promisify(removeFolder)(state.frontendFolder);
   });
 
-  fit('breakpoint inside .mjs file', async function(state) {
+  it('breakpoint inside .mjs file', async function(state) {
     const configDir = await fsMkdtemp(path.join(os.tmpdir(), 'ndb-test-'));
     const frontend = await launch({
       configDir: configDir,
@@ -204,7 +204,8 @@ module.exports.addTests = function({testRunner}) {
       debugFrontend: false,
       doNotCopyPreferences: true,
       appName: 'integration_test_runner',
-      releaseFrontendFolder: state.frontendFolder
+      releaseFrontendFolder: state.frontendFolder,
+      doNotProcessExit: true
     });
     await setupHelpers(frontend);
     await frontend.showScriptSource('index.mjs');
@@ -227,6 +228,34 @@ module.exports.addTests = function({testRunner}) {
       await frontend.resumeExecution();
     }
 
+    await frontend.close();
+    await util.promisify(removeFolder)(configDir);
+  });
+
+  it('Stay attached', async function(state) {
+    const configDir = await fsMkdtemp(path.join(os.tmpdir(), 'ndb-test-'));
+    const frontend = await launch({
+      configDir: configDir,
+      argv: ['.'],
+      cwd: path.join(__dirname, 'assets', 'test-project'),
+      debugFrontend: false,
+      doNotCopyPreferences: true,
+      appName: 'integration_test_runner',
+      releaseFrontendFolder: state.frontendFolder,
+      doNotProcessExit: true
+    });
+    await setupHelpers(frontend);
+    await frontend.setSetting('waitAtEnd', true);
+    frontend.runConfiguration('atexit');
+    await frontend.waitForConsoleMessage('42');
+    const processes = await frontend.nodeProcess();
+    processes.sort();
+    assert.equal(`node -e process.once('exit', _ => console.log(42))`, processes[0]);
+    assert.equal(`node npm run atexit`, processes[1]);
+    const targetDestroyed = frontend.waitTargetDestroyed(2);
+    await frontend.killProcess(`node -e process.once('exit', _ => console.log(42))`);
+    await targetDestroyed;
+    assert.deepStrictEqual([], await frontend.nodeProcess());
     await frontend.close();
     await util.promisify(removeFolder)(configDir);
   });
@@ -275,5 +304,45 @@ async function setupHelpers(frontend) {
 
   frontend.resumeExecution = function() {
     return this.evaluate(_ => new Promise(resolve => SourcesTestRunner.resumeExecution(resolve)));
+  };
+
+  frontend.setSetting = function(name, value) {
+    return this.evaluate((name, value) => Common.moduleSetting(name).set(value), name, value);
+  };
+
+  frontend.waitForConsoleMessage = function(text) {
+    return this.evaluate(text =>
+      new Promise(resolve => TestRunner.addSniffer(SDK.ConsoleModel.prototype, 'addMessage', msg => {
+        console.log(msg.messageText);
+        if (msg.messageText === text)
+          resolve();
+      }, true))
+        , text);
+  };
+
+  frontend.nodeProcess = function() {
+    return this.evaluate(_ => {
+      const titles = self.runtime.sharedInstance(Ndb.NodeProcesses).contentElement.querySelectorAll('div /deep/ .process-title');
+      return Array.from(titles).map(el => el.innerText);
+    });
+  };
+
+  frontend.killProcess = async function(name) {
+    const handle = await this.evaluateHandle(name => {
+      const titles = self.runtime.sharedInstance(Ndb.NodeProcesses).contentElement.querySelectorAll('div /deep/ li');
+      return Array.from(titles).find(e => e.innerText.split('\n')[0] === name);
+    }, name);
+    const element = handle.asElement();
+    await element.hover();
+    const btn = await element.$('div.controls-buttons');
+    await btn.click();
+  };
+
+  frontend.waitTargetDestroyed = async function(num) {
+    return this.evaluate(num =>
+      new Promise(resolve =>  Ndb.NodeProcessManager.instance().then(manager => {
+        manager.addEventListener(Ndb.NodeProcessManager.Events.Finished, _ => !--num && resolve());
+      }))
+        , num);
   };
 }
