@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const removeFolder = require('rimraf');
 const util = require('util');
 
 const {ReleaseBuilder} = require('./scripts/build_release_application.js');
@@ -15,8 +16,9 @@ const DEVTOOLS_DIR = path.dirname(
 
 (async function main() {
   const outputPath = path.join(__dirname, '.local-frontend');
-  if (!fs.existsSync(outputPath))
-    await util.promisify(fs.mkdir)(outputPath);
+  if (fs.existsSync(outputPath))
+    await util.promisify(removeFolder)(outputPath);
+  await util.promisify(fs.mkdir)(outputPath);
 
   new ReleaseBuilder([
     path.join(__dirname, 'front_end'),

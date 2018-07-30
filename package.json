@@ -13,7 +13,7 @@
   },
   "scripts": {
     "lint": "./node_modules/.bin/eslint .",
-    "postinstall": "node install.js",
+    "prepare": "node build.js",
     "dummyScriptForTest": "node -e 'console.log(239)'",
     "unit": "./node_modules/mocha/bin/mocha test/test.js",
     "integration": "node test/integration.js"
@@ -22,7 +22,6 @@
   "license": "Apache-2.0",
   "dependencies": {
     "chokidar": "^2.0.4",
-    "chrome-devtools-frontend": "1.0.576743",
     "clipboardy": "^1.2.3",
     "deasync": "^0.1.13",
     "fs-copy-file-sync": "^1.1.1",
@@ -40,6 +39,7 @@
     "ndb-node-pty-prebuilt": "^0.8.0"
   },
   "devDependencies": {
+    "chrome-devtools-frontend": "1.0.576743",
     "eslint": "^4.19.1",
     "mocha": "^5.2.0"
   }
