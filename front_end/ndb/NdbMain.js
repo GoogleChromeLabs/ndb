@@ -469,14 +469,12 @@ Ndb.NodeProcessManager.Events = {
   Detached: Symbol('detached')
 };
 
-/**
- * @implements {Protocol.InspectorBackend.Connection}
- */
-Ndb.NddConnection = class {
+Ndb.NddConnection = class extends Protocol.InspectorBackend.Connection {
   /**
    * @param {!Protocol.InspectorBackend.Connection.Params} params
    */
   constructor(nddService, instance, params) {
+    super();
     this.params = params;
     this._nddService = nddService;
     this._instance = instance;
@@ -486,7 +484,7 @@ Ndb.NddConnection = class {
    * @override
    * @param {string} message
    */
-  sendMessage(message) {
+  sendRawMessage(message) {
     return this._nddService.call('sendMessage', {
       instanceId: this._instance.id(),
       message: message
