@@ -16,6 +16,7 @@ try {
     process.env.NDD_GROUP_ID = nddGroupId;
   const parentProcessId = process.env.NDD_PID;
   process.env.NDD_PID = process.pid;
+  process.versions['ndb'] = process.env.NDB_VERSION;
 
   const stateFileName = path.join(nddStore, `${nodePid}`);
   const state = {
