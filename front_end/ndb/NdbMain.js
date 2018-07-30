@@ -300,6 +300,9 @@ Ndb.NodeProcessManager = class extends Common.Object {
     this._idToInstance = new Map();
     this._idToConnection = new Map();
 
+    this._lastDebugId = 0;
+    this._lastStarted = null;
+
     this._targetManager.addModelListener(
         SDK.RuntimeModel, SDK.RuntimeModel.Events.ExecutionContextDestroyed, this._onExecutionContextDestroyed, this);
   }
@@ -438,9 +441,12 @@ Ndb.NodeProcessManager = class extends Common.Object {
   }
 
   debug(execPath, args) {
+    const debugId = String(++this._lastDebugId);
+    this._lastStarted = {execPath, args, debugId};
     return this._nddService.call('debug', {
       execPath, args, options: {
         waitAtStart: true,
+        data: debugId,
         cwd: NdbProcessInfo.cwd
       }
     });
@@ -458,6 +464,19 @@ Ndb.NodeProcessManager = class extends Common.Object {
     return this._nddService.call('kill', {
       instanceId: instance.id()
     });
+  }
+
+  async restartLast() {
+    if (!this._lastStarted)
+      return;
+    for (const instance of this._idToInstance.values()) {
+      if (instance.debugId() === this._lastStarted.debugId) {
+        await this.kill(instance);
+        break;
+      }
+    }
+    const {execPath, args} = this._lastStarted;
+    this.debug(execPath, args);
   }
 };
 
@@ -508,6 +527,7 @@ Ndb.NodeProcess = class {
     this._groupId = data.groupId;
     this._instanceId = data.instanceId;
     this._url = data.url;
+    this._debugId = data.data || null;
 
     this._parent = parent;
     this._target = null;
@@ -533,6 +553,10 @@ Ndb.NodeProcess = class {
     return this._parent;
   }
 
+  debugId() {
+    return this._debugId;
+  }
+
   userFriendlyName() {
     return this.argv().map(arg => {
       const index1 = arg.lastIndexOf('/');
@@ -554,6 +578,27 @@ Ndb.NodeProcess = class {
   isRepl() {
     return this._argv.length === 2 && this._argv[0] === NdbProcessInfo.execPath &&
         this._argv[1] === NdbProcessInfo.repl;
+  }
+};
+
+/**
+ * @implements {UI.ActionDelegate}
+ * @unrestricted
+ */
+Ndb.RestartActionDelegate = class {
+  /**
+   * @override
+   * @param {!UI.Context} context
+   * @param {string} actionId
+   * @return {boolean}
+   */
+  handleAction(context, actionId) {
+    switch (actionId) {
+      case 'ndb.restart':
+        Ndb.NodeProcessManager.instance().then(manager => manager.restartLast());
+        return true;
+    }
+    return false;
   }
 };
 
@@ -611,4 +656,20 @@ DOMTokenList.prototype.toggle = function(token, force) {
   if (arguments.length === 1)
     force = !this.contains(token);
   return originalToggle.call(this, token, !!force);
+};
+
+Bindings.CompilerScriptMapping.prototype._sourceMapDetached = function(event) {
+  const script = /** @type {!SDK.Script} */ (event.data.client);
+  const frameId = script[Bindings.CompilerScriptMapping._frameIdSymbol];
+  const sourceMap = /** @type {!SDK.SourceMap} */ (event.data.sourceMap);
+  const bindings = script.isContentScript() ? this._contentScriptsBindings : this._regularBindings;
+  for (const sourceURL of sourceMap.sourceURLs()) {
+    const binding = bindings.get(sourceURL);
+    if (!binding)
+      continue;
+    binding.removeSourceMap(sourceMap, frameId);
+    if (!binding._uiSourceCode)
+      bindings.delete(sourceURL);
+  }
+  this._debuggerWorkspaceBinding.updateLocations(script);
 };

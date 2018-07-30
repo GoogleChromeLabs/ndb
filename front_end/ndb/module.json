@@ -43,6 +43,22 @@
             "defaultValue": true
         },
         {
+            "type": "action",
+            "actionId": "ndb.restart",
+            "className": "Ndb.RestartActionDelegate",
+            "title": "Restart last run configuration",
+            "bindings": [
+                {
+                    "platform": "windows,linux",
+                    "shortcut": "F5 Ctrl+R"
+                },
+                {
+                    "platform": "mac",
+                    "shortcut": "Meta+R"
+                }
+            ]
+        },
+        {
             "type": "@UI.ContextMenu.Provider",
             "contextTypes": [
                 "Workspace.UISourceCode"
