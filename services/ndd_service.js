@@ -18,6 +18,8 @@ const {ServiceBase} = require('./service_base.js');
 
 const wsSymbol = Symbol('WebSocket');
 
+const NDB_VERSION = require('../package.json').version;
+
 class NddService extends ServiceBase {
   constructor() {
     super();
@@ -117,7 +119,8 @@ class NddService extends ServiceBase {
     const env = {
       NODE_OPTIONS: `--require ${require.resolve('../node_debug_demon/preload.js')} --inspect=0`,
       NDD_STORE: this._nddStore,
-      NDD_DEASYNC_JS: require.resolve('deasync')
+      NDD_DEASYNC_JS: require.resolve('deasync'),
+      NDB_VERSION
     };
     if (options && options.waitAtStart)
       env.NDD_WAIT_AT_START = 1;
