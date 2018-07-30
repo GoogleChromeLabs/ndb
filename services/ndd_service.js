@@ -123,6 +123,8 @@ class NddService extends ServiceBase {
       env.NDD_WAIT_AT_START = 1;
     if (options && options.groupId)
       env.NDD_GROUP_ID = options.groupId;
+    if (options && options.data)
+      env.NDD_DATA = options.data;
     const p = spawn(execPath, args, {
       cwd: options.cwd,
       env: { ...process.env, ...env },
