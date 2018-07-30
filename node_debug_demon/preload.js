@@ -26,6 +26,8 @@ try {
   };
   if (parentProcessId)
     state.parentId = parentProcessId;
+  if (process.env.NDD_DATA)
+    state.data = process.env.NDD_DATA;
   fs.writeFileSync(stateFileName, JSON.stringify(state));
 
   const readyFileName = path.join(nddStore, `${nodePid}-ready`);
