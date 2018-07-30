@@ -35,6 +35,27 @@ Ndb.NdbMain = class extends Common.Object {
         .then(this._startRepl.bind(this));
   }
 
+  static _defaultExcludePattern() {
+    const defaultCommonExcludedFolders = [
+      '/bower_components/', '/\\.devtools', '/\\.git/', '/\\.sass-cache/', '/\\.hg/', '/\\.idea/',
+      '/\\.svn/', '/\\.cache/', '/\\.project/'
+    ];
+    const defaultWinExcludedFolders = ['/Thumbs.db$', '/ehthumbs.db$', '/Desktop.ini$', '/\\$RECYCLE.BIN/'];
+    const defaultMacExcludedFolders = [
+      '/\\.DS_Store$', '/\\.Trashes$', '/\\.Spotlight-V100$', '/\\.AppleDouble$', '/\\.LSOverride$', '/Icon$',
+      '/\\._.*$'
+    ];
+    const defaultLinuxExcludedFolders = ['/.*~$'];
+    let defaultExcludedFolders = defaultCommonExcludedFolders;
+    if (Host.isWin())
+      defaultExcludedFolders = defaultExcludedFolders.concat(defaultWinExcludedFolders);
+    else if (Host.isMac())
+      defaultExcludedFolders = defaultExcludedFolders.concat(defaultMacExcludedFolders);
+    else
+      defaultExcludedFolders = defaultExcludedFolders.concat(defaultLinuxExcludedFolders);
+    return defaultExcludedFolders;
+  }
+
   static _calculateBlackboxState() {
     const whitelistOnlyProject = Common.moduleSetting('blackboxAnythingOutsideCwd').get();
     const whitelistModules = Common.moduleSetting('whitelistedModules').get().split(',');
@@ -69,7 +90,7 @@ Ndb.NdbMain = class extends Common.Object {
       excludePattern = '^/[^/]+/[^/]+/[^/]+/';
     }
     const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
-    setting.set(excludePattern);
+    setting.set([excludePattern, ...Ndb.NdbMain._defaultExcludePattern()].join('|'));
     setExcludedPattern(excludePattern);
 
     function populateFolders(folders, currentRoot) {
