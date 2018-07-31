@@ -694,3 +694,24 @@ Bindings.CompilerScriptMapping.prototype._sourceMapDetached = function(event) {
   }
   this._debuggerWorkspaceBinding.updateLocations(script);
 };
+
+/**
+ * @param {string} sourceMapURL
+ * @param {string} compiledURL
+ * @return {!Promise<?SDK.TextSourceMap>}
+ * @this {SDK.TextSourceMap}
+ */
+SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
+  let callback;
+  const promise = new Promise(fulfill => callback = fulfill);
+  const {payload, error} = await loadSourceMap(sourceMapURL, compiledURL);
+  if (error || !payload)
+    return null;
+  try {
+    return new SDK.TextSourceMap(compiledURL, sourceMapURL, payload);
+  } catch (e) {
+    console.error(e);
+    Common.console.warn('DevTools failed to parse SourceMap: ' + sourceMapURL);
+    return null;
+  }
+}
