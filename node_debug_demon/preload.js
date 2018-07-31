@@ -40,7 +40,7 @@ try {
         const commandLineAPIDebug = debug;
         process.binding('inspector').callAndPauseOnStart = (fn, receiver, ...args) => {
           commandLineAPIDebug(fn);
-          fn.apply(receiver, args);
+          return fn.apply(receiver, args);
         };
       }
       wait = false;
