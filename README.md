@@ -19,9 +19,18 @@ npm install -g ndb
 yarn global add ndb
 ```
 
+Ndb can also be installed as a development dependency:
+```bash
+npm install --save-dev ndb
+```
+
+With a local installation, ndb can be run by calling it from within an npm script (e.g. `{'debug': 'ndb index.js'}`). In this case, ndb will not be available in your system path.
+
 Compatibility: ndb requires Node >=8.0.0. It works best with Node >=10.
 
 Installation: ndb depends on [Puppeteer](https://github.com/GoogleChrome/puppeteer) which downloads a recent version of Chromium (~170MB Mac, ~280MB Linux, ~280MB Win).
+
+All users: Global installation may fail with different permission errors, you can find help in this [thread](https://github.com/GoogleChromeLabs/ndb/issues/20).
 
 Windows users: Installation may fail on Windows during compilation the native dependencies. The following command may help: `npm install --g --production windows-build-tools`
 
