@@ -14,6 +14,8 @@ try {
 
 const {ServiceBase} = require('./service_base.js');
 
+const NDB_VERSION = require('../package.json').version;
+
 class Terminal extends ServiceBase {
   init(params) {
     if (!pty)
@@ -25,10 +27,9 @@ class Terminal extends ServiceBase {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        NODE_OPTIONS: `--require ${params.preload} --inspect=0`,
-        NDD_DEASYNC_JS: require.resolve('deasync'),
+        NODE_OPTIONS: `--require ${params.preload}`,
         NDD_STORE: params.nddStore,
-        NDD_WAIT_AT_START: 1
+        NDB_VERSION
       }
     });
 
