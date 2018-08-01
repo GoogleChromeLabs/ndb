@@ -25,7 +25,7 @@ class Terminal extends ServiceBase {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        NODE_OPTIONS: `--require ${require.resolve('../node_debug_demon/preload.js')} --inspect=0`,
+        NODE_OPTIONS: `--require ${params.preload} --inspect=0`,
         NDD_DEASYNC_JS: require.resolve('deasync'),
         NDD_STORE: params.nddStore,
         NDD_WAIT_AT_START: 1

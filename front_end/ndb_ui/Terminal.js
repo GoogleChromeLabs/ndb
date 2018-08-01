@@ -47,7 +47,8 @@ Ndb.Terminal = class extends UI.VBox {
     const {error} = await this._service.call('init', {
       cols: this._terminal.cols,
       rows: this._terminal.rows,
-      nddStore: nddStore
+      nddStore: nddStore,
+      preload: NdbProcessInfo.preload
     });
     this._ready = true;
     if (this._buffer.length) {

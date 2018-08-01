@@ -468,7 +468,8 @@ Ndb.NodeProcessManager = class extends Common.Object {
       execPath, args, options: {
         waitAtStart: true,
         data: debugId,
-        cwd: NdbProcessInfo.cwd
+        cwd: NdbProcessInfo.cwd,
+        preload: NdbProcessInfo.preload
       }
     });
   }
