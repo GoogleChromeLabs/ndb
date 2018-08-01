@@ -117,7 +117,7 @@ class NddService extends ServiceBase {
 
   async debug({execPath, args, options}) {
     const env = {
-      NODE_OPTIONS: `--require ${require.resolve('../node_debug_demon/preload.js')} --inspect=0`,
+      NODE_OPTIONS: `--require ${options.preload} --inspect=0`,
       NDD_STORE: this._nddStore,
       NDD_DEASYNC_JS: require.resolve('deasync'),
       NDB_VERSION
