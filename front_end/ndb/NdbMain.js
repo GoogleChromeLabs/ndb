@@ -272,7 +272,6 @@ Ndb.ServiceManager = class {
   }
 };
 Ndb.serviceManager = new Ndb.ServiceManager();
-SDK.targetManager.mainTarget = () => null;
 
 Ndb.Service = class extends Common.Object {
   constructor(serviceId) {
@@ -307,7 +306,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
   static async _create() {
     const service = await Ndb.serviceManager.create('ndd_service');
     const instance = new Ndb.NodeProcessManager(SDK.targetManager, service);
-    instance._nddStore = await service.call('start');
+    instance._nddStore = await service.call('init');
     Ndb.NodeProcessManager._instanceReady(instance);
     delete Ndb.NodeProcessManager._instanceReady;
   }
@@ -318,38 +317,15 @@ Ndb.NodeProcessManager = class extends Common.Object {
 
     this._nddService = nddService;
     this._nddService.addEventListener(Ndb.Service.Events.Notification, this._onNotification.bind(this));
-    this._idToInstance = new Map();
-    this._idToConnection = new Map();
+
+    this._processes = new Map();
+    this._connections = new Map();
 
     this._lastDebugId = 0;
     this._lastStarted = null;
 
     this._targetManager.addModelListener(
         SDK.RuntimeModel, SDK.RuntimeModel.Events.ExecutionContextDestroyed, this._onExecutionContextDestroyed, this);
-  }
-
-  existingInstances() {
-    return this._idToInstance.values();
-  }
-
-  /**
-   * @param {!Ndb.NodeProcess} instance
-   * @return {!Promise<boolean>}
-   */
-  attach(instance) {
-    return this._nddService.call('attach', {
-      instanceId: instance.id()
-    });
-  }
-
-  /**
-   * @param {!Ndb.NodeProcess} instance
-   * @return {!Promise<boolean>}
-   */
-  detach(instance) {
-    return this._nddService.call('detach', {
-      instanceId: instance.id()
-    });
   }
 
   nddStore() {
@@ -359,65 +335,49 @@ Ndb.NodeProcessManager = class extends Common.Object {
   _onNotification({data: {name, params}}) {
     if (name === 'added')
       this._onProcessAdded(params);
-    else if (name === 'finished')
-      this._onProcessFinished(params);
-    else if (name === 'attached')
-      this._onAttached(params);
-    else if (name === 'detached')
-      this._onDetached(params);
-    else if (name === 'message')
-      this._onMessage(params);
   }
 
-  _onProcessAdded(data) {
-    const parent = data.parentId ? this._idToInstance.get(data.parentId) : null;
-    const instance = new Ndb.NodeProcess(data, parent);
-    this._idToInstance.set(instance.id(), instance);
-    this.dispatchEventToListeners(Ndb.NodeProcessManager.Events.Added, instance);
-
-    this.attach(instance);
-  }
-
-  _onProcessFinished({instanceId}) {
-    const instance = this._idToInstance.get(instanceId);
-    if (instance)
-      this.dispatchEventToListeners(Ndb.NodeProcessManager.Events.Finished, instance);
-  }
-
-  async _onAttached({instanceId}) {
-    const instance = this._idToInstance.get(instanceId);
-    if (!instance)
+  async _onProcessAdded(payload) {
+    let targetInfo;
+    try {
+      ([targetInfo] = await (await fetch(payload.targetListUrl)).json());
+    } catch (e) {
       return;
-    const target = this._targetManager.createTarget(
-        instance.id(), instance.userFriendlyName(), SDK.Target.Capability.JS,
-        this._createConnection.bind(this, instance), null, true);
-    await target.runtimeAgent().invoke_evaluate({
-      expression: `process.runIfWaitingAtStart && process.runIfWaitingAtStart(${this._shouldPauseAtStart(instance)})`,
-      includeCommandLineAPI: true
-    });
-
-    instance.setTarget(target);
-    this.dispatchEventToListeners(Ndb.NodeProcessManager.Events.Attached, instance);
-    if (instance.isRepl() && !self._replMessageShown) {
-      self._replMessageShown = true;
-      let message;
-      if (Common.moduleSetting('uiTheme').get() === 'default') {
-        message =
-          new Common.Console.Message('\u001b[30mWelcome to the ndb \u001b\[32mR\u001b\[31mE\u001b\[34mP\u001b\[90mL\u001b[30m!\u001b[0m', Common.Console.MessageLevel.Info, 1, false);
-      } else {
-        message =
-          new Common.Console.Message('\u001b[97mWelcome to the ndb \u001b\[92mR\u001b\[33mE\u001b\[31mP\u001b\[39mL\u001b[97m!\u001b[0m', Common.Console.MessageLevel.Info, 1, false);
-      }
-      Common.console._messages.push(message);
-      Common.console.dispatchEventToListeners(Common.Console.Events.MessageAdded, message);
     }
+    const pid = payload.id;
+    const processInfo = new Ndb.ProcessInfo(payload);
+    this._processes.set(pid, processInfo);
+
+    const parentTarget = payload.ppid ? this._targetManager.targetById(payload.ppid) : null;
+    const target = this._targetManager.createTarget(
+        pid, processInfo.userFriendlyName(), SDK.Target.Capability.JS,
+        this._createConnection.bind(this, pid, targetInfo.webSocketDebuggerUrl),
+        parentTarget, true);
+    if (this._shouldPauseAtStart(payload.argv)) {
+      target.runtimeAgent().invoke_evaluate({
+        expression: `process.breakAtStart && process.breakAtStart()`,
+        includeCommandLineAPI: true
+      });
+    }
+    return target.runtimeAgent().runIfWaitingForDebugger();
   }
 
-  _shouldPauseAtStart(instance) {
+  _createConnection(id, webSocketDebuggerUrl, params) {
+    const connection = new SDK.WebSocketConnection(webSocketDebuggerUrl,
+        _ => {
+          this._connections.delete(id);
+          this._processes.delete(id);
+        },
+        params);
+    this._connections.set(id, connection);
+    return connection;
+  }
+
+  _shouldPauseAtStart(argv) {
     if (!Common.moduleSetting('pauseAtStart').get())
       return false;
     if (Common.moduleSetting('blackboxAnythingOutsideCwd').get()) {
-      const [_, arg] = instance.argv();
+      const [_, arg] = argv;
       if (arg && (arg === NdbProcessInfo.repl ||
           arg.endsWith('/bin/npm') || arg.endsWith('\\bin\\npm') ||
           arg.endsWith('/bin/yarn') || arg.endsWith('\\bin\\yarn') ||
@@ -427,38 +387,18 @@ Ndb.NodeProcessManager = class extends Common.Object {
     return true;
   }
 
-  _createConnection(instance, params) {
-    const connection = new Ndb.NddConnection(this._nddService, instance, params);
-    this._idToConnection.set(instance.id(), connection);
-    return connection;
-  }
-
-  _onDetached({instanceId}) {
-    const connection = this._idToConnection.get(instanceId);
-    if (connection) {
-      this._idToConnection.delete(instanceId);
-      connection.params.onDisconnect();
-    }
-    const instance = this._idToInstance.get(instanceId);
-    instance.setTarget(null);
-    this.dispatchEventToListeners(Ndb.NodeProcessManager.Events.Detached, instance);
-  }
-
-  _onMessage({instanceId, message}) {
-    const connection = this._idToConnection.get(instanceId);
-    if (connection)
-      connection.params.onMessage(message);
-  }
-
   _onExecutionContextDestroyed({data: executionContext}) {
     if (Common.moduleSetting('waitAtEnd').get() || executionContext.id !== 1)
       return;
     if (executionContext.target().suspended())
       return;
-    for (const [_, instance] of this._idToInstance) {
-      if (instance.target() === executionContext.target())
-        this.detach(instance);
-    }
+    const connection = this._connections.get(executionContext.target().id());
+    if (connection)
+      connection.disconnect();
+  }
+
+  infoForTarget(target) {
+    return this._processes.get(target.id()) || null;
   }
 
   debug(execPath, args) {
@@ -466,7 +406,6 @@ Ndb.NodeProcessManager = class extends Common.Object {
     this._lastStarted = {execPath, args, debugId};
     return this._nddService.call('debug', {
       execPath, args, options: {
-        waitAtStart: true,
         data: debugId,
         cwd: NdbProcessInfo.cwd,
         preload: NdbProcessInfo.preload
@@ -474,109 +413,41 @@ Ndb.NodeProcessManager = class extends Common.Object {
     });
   }
 
-  run(execPath, args) {
-    return this._nddService.call('run', {
-      execPath, args, options: {
-        cwd: NdbProcessInfo.cwd
-      }
-    });
-  }
-
-  kill(instance) {
+  kill(target) {
     return this._nddService.call('kill', {
-      instanceId: instance.id()
+      id: target.id()
     });
   }
 
   async restartLast() {
     if (!this._lastStarted)
       return;
-    for (const instance of this._idToInstance.values()) {
-      if (instance.debugId() === this._lastStarted.debugId) {
-        await this.kill(instance);
-        break;
-      }
+    const promises = [];
+    for (const target of SDK.targetManager.targets()) {
+      const info = this.infoForTarget(target);
+      if (!info)
+        continue;
+      if (info.data() === this._lastStarted.debugId)
+        promises.push(this.kill(target));
     }
+    await Promise.all(promises);
     const {execPath, args} = this._lastStarted;
     this.debug(execPath, args);
   }
 };
 
-/** @enum {symbol} */
-Ndb.NodeProcessManager.Events = {
-  Added: Symbol('added'),
-  Finished: Symbol('finished'),
-  Attached: Symbol('attached'),
-  Detached: Symbol('detached')
-};
-
-Ndb.NddConnection = class extends Protocol.InspectorBackend.Connection {
-  /**
-   * @param {!Protocol.InspectorBackend.Connection.Params} params
-   */
-  constructor(nddService, instance, params) {
-    super();
-    this.params = params;
-    this._nddService = nddService;
-    this._instance = instance;
-  }
-
-  /**
-   * @override
-   * @param {string} message
-   */
-  sendRawMessage(message) {
-    return this._nddService.call('sendMessage', {
-      instanceId: this._instance.id(),
-      message: message
-    });
-  }
-
-  /**
-   * @override
-   * @return {!Promise}
-   */
-  disconnect() {
-    return this._nddService.call('detach', {
-      instanceId: this._instance.id(),
-    });
-  }
-};
-
-Ndb.NodeProcess = class {
-  constructor(data, parent) {
-    this._argv = data.argv;
-    this._groupId = data.groupId;
-    this._instanceId = data.instanceId;
-    this._url = data.url;
-    this._debugId = data.data || null;
-
-    this._parent = parent;
-    this._target = null;
+Ndb.ProcessInfo = class {
+  constructor(payload) {
+    this._argv = payload.argv;
+    this._data = payload.data;
   }
 
   argv() {
     return this._argv;
   }
 
-  groupId() {
-    return this._groupId;
-  }
-
-  id() {
-    return this._instanceId;
-  }
-
-  url() {
-    return this._url;
-  }
-
-  parent() {
-    return this._parent;
-  }
-
-  debugId() {
-    return this._debugId;
+  data() {
+    return this._data;
   }
 
   userFriendlyName() {
@@ -587,14 +458,6 @@ Ndb.NodeProcess = class {
         return arg;
       return arg.slice(Math.max(index1, index2) + 1);
     }).join(' ');
-  }
-
-  target() {
-    return this._target;
-  }
-
-  setTarget(target) {
-    this._target = target;
   }
 
   isRepl() {
@@ -623,6 +486,8 @@ Ndb.RestartActionDelegate = class {
     return false;
   }
 };
+
+SDK.targetManager.mainTarget = () => null;
 
 SDK.DebuggerModel.prototype.scheduleStepIntoAsync = function() {
   this._agent.scheduleStepIntoAsync();
@@ -703,8 +568,6 @@ Bindings.CompilerScriptMapping.prototype._sourceMapDetached = function(event) {
  * @this {SDK.TextSourceMap}
  */
 SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
-  let callback;
-  const promise = new Promise(fulfill => callback = fulfill);
   const {payload, error} = await loadSourceMap(sourceMapURL, compiledURL);
   if (error || !payload)
     return null;
@@ -715,4 +578,4 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
     Common.console.warn('DevTools failed to parse SourceMap: ' + sourceMapURL);
     return null;
   }
-}
+};
