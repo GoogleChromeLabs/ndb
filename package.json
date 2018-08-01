@@ -22,18 +22,15 @@
   "license": "Apache-2.0",
   "dependencies": {
     "chokidar": "^2.0.4",
-    "clipboardy": "^1.2.3",
     "chrome-devtools-frontend": "1.0.578928",
-    "deasync": "^0.1.13",
+    "clipboardy": "^1.2.3",
     "fs-copy-file-sync": "^1.1.1",
     "isbinaryfile": "^3.0.2",
     "mime": "^2.3.1",
     "opn": "^5.3.0",
     "puppeteer": "1.6.1",
     "rimraf": "^2.6.2",
-    "uglify-es": "^3.3.10",
     "update-notifier": "^2.5.0",
-    "ws": "^5.2.2",
     "xterm": "^3.5.1"
   },
   "optionalDependencies": {
@@ -41,6 +38,7 @@
   },
   "devDependencies": {
     "eslint": "^4.19.1",
-    "mocha": "^5.2.0"
+    "mocha": "^5.2.0",
+    "uglify-es": "^3.3.9"
   }
 }
