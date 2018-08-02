@@ -12,6 +12,8 @@ try {
   error = e.stack;
 }
 
+const fs = require('fs');
+
 const {ServiceBase} = require('./service_base.js');
 
 const NDB_VERSION = require('../package.json').version;
@@ -20,7 +22,10 @@ class Terminal extends ServiceBase {
   init(params) {
     if (!pty)
       throw {message: error};
-    this._term = pty.spawn(process.platform === 'win32' ? 'cmd.exe' : 'bash', [], {
+    let shell = process.env.SHELL;
+    if (!shell || !fs.existsSync(shell))
+      shell = process.platform === 'win32' ? 'cmd.exe' : 'bash';
+    this._term = pty.spawn(shell, [], {
       name: 'xterm-color',
       cols: params.cols || 80,
       rows: params.rows || 24,
