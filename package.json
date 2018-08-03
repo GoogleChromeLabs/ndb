@@ -31,6 +31,7 @@
     "puppeteer": "1.6.1",
     "rimraf": "^2.6.2",
     "update-notifier": "^2.5.0",
+    "ws": "^6.0.0",
     "xterm": "^3.5.1"
   },
   "optionalDependencies": {
