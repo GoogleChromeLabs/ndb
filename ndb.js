@@ -7,7 +7,7 @@
 
 const updateNotifier = require('update-notifier');
 // Tell user if there's a newer version of ndb.
-updateNotifier({pkg: require('./package.json')}).notify();
+updateNotifier({pkg: require('./package.json')}).notify({isGlobal: true});
 
 const os = require('os');
 const path = require('path');
