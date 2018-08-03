@@ -262,12 +262,13 @@ Ndb.ServiceManager = class {
     return service;
   }
 
-  notify(serviceId, notification) {
-    const service = this._runningServices.get(serviceId);
-    if (service) {
-      if (notification.method === 'disposed')
+  notify(notifications) {
+    for (const {serviceId, callId, payload} of notifications) {
+      const service = this._runningServices.get(serviceId);
+      if (service)
+        service._notify(callId, payload);
+      if (!callId && payload.method === 'disposed')
         this._runningServices.delete(serviceId);
-      service.dispatchEventToListeners(Ndb.Service.Events.Notification, notification);
     }
   }
 };
@@ -277,11 +278,33 @@ Ndb.Service = class extends Common.Object {
   constructor(serviceId) {
     super();
     this._serviceId = serviceId;
+    this._lastCallId = 0;
+    this._callbacks = new Map();
   }
 
-  async call(method, options) {
-    const {result, error} = await callNdbService(this._serviceId, method, options);
-    return error || !result ? {error} : result;
+  call(method, options) {
+    const callId = ++this._lastCallId;
+    const promise = new Promise(resolve => this._callbacks.set(callId, resolve));
+    callNdbService(JSON.stringify({
+      serviceId: this._serviceId,
+      callId,
+      method,
+      options
+    }));
+    return promise;
+  }
+
+  _notify(callId, payload) {
+    if (callId) {
+      const callback = this._callbacks.get(callId);
+      this._callbacks.delete(callId);
+      if (callback) {
+        const {result, error} = payload || {};
+        callback(error || !result ? {error} : result);
+      }
+    } else {
+      this.dispatchEventToListeners(Ndb.Service.Events.Notification, payload);
+    }
   }
 };
 
@@ -338,12 +361,6 @@ Ndb.NodeProcessManager = class extends Common.Object {
   }
 
   async _onProcessAdded(payload) {
-    let targetInfo;
-    try {
-      ([targetInfo] = await (await fetch(payload.targetListUrl)).json());
-    } catch (e) {
-      return;
-    }
     const pid = payload.id;
     const processInfo = new Ndb.ProcessInfo(payload);
     this._processes.set(pid, processInfo);
@@ -351,7 +368,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
     const parentTarget = payload.ppid ? this._targetManager.targetById(payload.ppid) : null;
     const target = this._targetManager.createTarget(
         pid, processInfo.userFriendlyName(), SDK.Target.Capability.JS,
-        this._createConnection.bind(this, pid, targetInfo.webSocketDebuggerUrl),
+        this._createConnection.bind(this, pid),
         parentTarget, true);
     if (this._shouldPauseAtStart(payload.argv)) {
       target.runtimeAgent().invoke_evaluate({
@@ -362,15 +379,15 @@ Ndb.NodeProcessManager = class extends Common.Object {
     return target.runtimeAgent().runIfWaitingForDebugger();
   }
 
-  _createConnection(id, webSocketDebuggerUrl, params) {
-    const connection = new SDK.WebSocketConnection(webSocketDebuggerUrl,
-        _ => {
-          this._connections.delete(id);
-          this._processes.delete(id);
-        },
-        params);
+  _createConnection(id, params) {
+    const connection = new Ndb.Connection(id, this._nddService, this._onWebSocketDisconnected.bind(this, id), params);
     this._connections.set(id, connection);
     return connection;
+  }
+
+  _onWebSocketDisconnected(id) {
+    this._connections.delete(id);
+    this._processes.delete(id);
   }
 
   _shouldPauseAtStart(argv) {
@@ -433,6 +450,48 @@ Ndb.NodeProcessManager = class extends Common.Object {
     await Promise.all(promises);
     const {execPath, args} = this._lastStarted;
     this.debug(execPath, args);
+  }
+};
+
+/**
+ * @implements {Protocol.InspectorBackend.Connection}
+ */
+Ndb.Connection = class {
+  constructor(pid, nddService, onWebSocketDisconnect, params) {
+    this._pid = pid;
+    this._nddService = nddService;
+    this._onDisconnect = params.onDisconnect;
+    this._onMessage = params.onMessage;
+    this._onWebSocketDisconnect = onWebSocketDisconnect;
+    this._nddService.addEventListener(Ndb.Service.Events.Notification, this._onServiceNotification.bind(this));
+  }
+
+  _onServiceNotification({data: {name, params}}) {
+    if (name === 'message' && params.id === this._pid)
+      this._onMessage.call(null, params.message);
+    if (name === 'disconnected' && params.id === this._pid) {
+      this._onWebSocketDisconnect.call(null);
+      this._onDisconnect.call(null, 'websocket closed');
+    }
+  }
+
+  /**
+   * @param {string} domain
+   * @param {!Protocol.InspectorBackend.Connection.MessageObject} messageObject
+   */
+  sendMessage(domain, messageObject) {
+    return this._nddService.call('send', {
+      id: this._pid,
+      message: JSON.stringify(messageObject)
+    });
+  }
+
+  /**
+   * @return {!Promise}
+   */
+  disconnect() {
+    return this._nddService.call('disconnect', {id: this._pid})
+        .then(_ => this._onDisconnect.call(null, 'force disconnect'));
   }
 };
 

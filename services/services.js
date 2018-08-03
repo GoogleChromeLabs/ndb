@@ -18,17 +18,37 @@ class Services {
   }
 
   static async create(frontend) {
-    const services = new Services((serviceId, message) => {
-      frontend.safeEvaluate(function(serviceId, message, isDebugFrontend) {
-        callFrontend(_ => Ndb.serviceManager.notify(serviceId, message));
-      }, serviceId, message, !!process.env.NDB_DEBUG_FRONTEND);
+    const cdpSession = await frontend.target().createCDPSession();
+    cdpSession.send('Runtime.enable', {});
+    let buffer = [];
+    let timer = 0;
+    const services = new Services((serviceId, callId, payload) => {
+      if (!timer) {
+        timer = setTimeout(_ => {
+          timer = 0;
+          const expression = `Ndb.serviceManager.notify(${JSON.stringify(buffer)})`;
+          buffer = [];
+          cdpSession.send('Runtime.evaluate', {
+            expression: process.env.NDB_DEBUG_FRONTEND ? `callFrontend(_ => ${expression}),null` : `${expression},null`
+          });
+        }, 50);
+      }
+      buffer.push({serviceId, callId, payload});
     });
     await Promise.all([
       frontend.exposeFunction('createNdbService', services.createNdbService.bind(services)),
-      frontend.exposeFunction('callNdbService', services.callNdbService.bind(services))
+      cdpSession.send('Runtime.addBinding', {name: 'callNdbService'})
     ]);
+    cdpSession.on('Runtime.bindingCalled', event => services._onBindingCalled(event));
     frontend.on('close', services.dispose.bind(services));
     return services;
+  }
+
+  _onBindingCalled(event) {
+    if (event.name !== 'callNdbService')
+      return;
+    const {serviceId, callId, method, options} = JSON.parse(event.payload);
+    this.callNdbService(serviceId, callId, method, options);
   }
 
   createNdbService(name, serviceDir) {
@@ -47,12 +67,14 @@ class Services {
     })).then(_ => ({serviceId}));
   }
 
-  callNdbService(serviceId, method, options) {
+  callNdbService(serviceId, callId, method, options) {
     const {service, callbacks, disposeCallbacks} = this._serviceIdToService.get(serviceId) || {};
-    if (!service)
-      return {error: `Service with id=${serviceId} not found`};
+    if (!service) {
+      this._notify(serviceId, callId, {error: `Service with id=${serviceId} not found`});
+      return;
+    }
     const callbackId = ++this._lastCallbackId;
-    const promise = new Promise(resolve => callbacks.set(callbackId, resolve));
+    callbacks.set(callbackId, this._notify.bind(this, serviceId, callId));
     if (method === 'dispose')
       disposeCallbacks.add(callbackId);
     service.send({
@@ -60,7 +82,6 @@ class Services {
       options,
       callbackId
     });
-    return promise;
   }
 
   dispose() {
@@ -75,7 +96,7 @@ class Services {
   _onServiceMessage(serviceId, {message, callbackId}) {
     const {service, callbacks, readyCallback} = this._serviceIdToService.get(serviceId) || {};
     if (!service) {
-      this._notify(serviceId, {error: `Service with id=${serviceId} not found`});
+      this._notify(serviceId, undefined, {error: `Service with id=${serviceId} not found`});
       return;
     }
     if (callbackId) {
@@ -86,7 +107,7 @@ class Services {
       if (message.name === 'ready')
         readyCallback();
       else
-        this._notify(serviceId, message);
+        this._notify(serviceId, undefined, message);
     }
   }
 
@@ -101,7 +122,7 @@ class Services {
       else
         callback({error: `Service with id=${serviceId} was disposed`});
     }
-    this._notify(serviceId, { name: 'disposed' });
+    this._notify(serviceId, undefined, { name: 'disposed' });
   }
 }
 
