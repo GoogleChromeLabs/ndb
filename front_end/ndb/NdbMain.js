@@ -18,7 +18,10 @@ Ndb.NdbMain = class extends Common.Object {
     Common.moduleSetting('whitelistedModules').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
     Ndb.NdbMain._calculateBlackboxState();
     this._startRepl();
-    Ndb.sourceMapManager = new Ndb.SourceMapManager();
+
+    Ndb.fileSystemMapping = new Ndb.FileSystemMapping();
+    Bindings.debuggerWorkspaceBinding.addSourceMapping(Ndb.fileSystemMapping);
+
     registerFileSystem('cwd', NdbProcessInfo.cwd).then(_ => {
       InspectorFrontendAPI.fileSystemAdded(undefined, {
         fileSystemName: 'cwd',
@@ -139,85 +142,6 @@ Ndb.mainConfiguration = () => {
     execPath,
     args
   };
-};
-
-class SourceMappableState extends Bindings.BreakpointManager.Breakpoint.State {
-  constructor(url, scriptId, scriptHash, lineNumber, columnNumber, condition) {
-    super(url, scriptId, scriptHash, lineNumber, columnNumber, condition);
-    if (!scriptId && !scriptHash && url) {
-      const sourceMap = Ndb.sourceMapManager.sourceMap(url);
-      if (sourceMap) {
-        const entry = sourceMap.sourceLineMapping(url, lineNumber, columnNumber);
-        if (entry) {
-          this.url = sourceMap.compiledURL();
-          this.lineNumber = entry.lineNumber;
-          this.columnNumber = entry.columnNumber;
-        }
-      }
-    }
-  }
-}
-
-Bindings.BreakpointManager.Breakpoint.State = SourceMappableState;
-
-Ndb.SourceMapManager = class {
-  constructor() {
-    this._manager = new SDK.SourceMapManager({
-      inspectedURL: _ => Common.ParsedURL.platformPathToURL(NdbProcessInfo.cwd)
-    });
-    this._manager.addEventListener(
-        SDK.SourceMapManager.Events.SourceMapAttached, this._sourceMapAttached, this);
-    Workspace.workspace.addEventListener(Workspace.Workspace.Events.UISourceCodeAdded, this._uiSourceCodeAdded, this);
-
-    this._bindings = new Map();
-    this._fileUrlToSourceMap = new Map();
-  }
-
-  _sourceMapDetected(fsPath, fileName, sourceMappingUrl) {
-    const fsPathUrl = Common.ParsedURL.platformPathToURL(fsPath);
-    const fileUrl = Common.ParsedURL.platformPathToURL(fileName);
-    this._manager.attachSourceMap({fsPathUrl, fileUrl}, fileUrl, sourceMappingUrl);
-  }
-
-  /**
-   * @param {!Common.Event} event
-   */
-  _sourceMapAttached(event) {
-    const {fsPathUrl, fileUrl} = event.data.client;
-    const sourceMap = /** @type {!SDK.SourceMap} */ (event.data.sourceMap);
-    for (const sourceUrl of sourceMap.sourceURLs()) {
-      this._bindings.set(`${fsPathUrl}|${sourceUrl}`, sourceMap);
-      this._fileUrlToSourceMap.set(sourceUrl, sourceMap);
-    }
-    const fileSystemProjects = Workspace.workspace.projectsForType('filesystem');
-    for (const fileSystemProject of fileSystemProjects) {
-      if (fileSystemProject.fileSystemPath() === fsPathUrl) {
-        const uiSourceCode = fileSystemProject.uiSourceCodeForURL(fileUrl);
-        if (uiSourceCode) {
-          uiSourceCode[Bindings.CompilerScriptMapping._sourceMapSymbol] = sourceMap;
-          break;
-        }
-      }
-    }
-  }
-
-  sourceMap(fileUrl) {
-    return this._fileUrlToSourceMap.get(fileUrl) || null;
-  }
-
-  /**
-   * @param {!Common.Event} event
-   */
-  _uiSourceCodeAdded(event) {
-    const uiSourceCode = /** @type {!Workspace.UISourceCode} */ (event.data);
-    const project = uiSourceCode.project();
-    if (project.type() !== 'filesystem')
-      return;
-    const key = `${project.fileSystemPath()}|${uiSourceCode.url()}`;
-    const sourceMap = this._bindings.get(key);
-    if (sourceMap)
-      uiSourceCode[Bindings.CompilerScriptMapping._sourceMapSymbol] = sourceMap;
-  }
 };
 
 /**
