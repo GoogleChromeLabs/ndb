@@ -120,7 +120,7 @@ Ndb.NodeProcesses = class extends UI.VBox {
     const ui = this._targetToUI.get(target);
     if (ui) {
       const parentTreeElement = ui.treeElement.parent;
-      for (const child of ui.treeElement.children()) {
+      for (const child of ui.treeElement.children().slice()) {
         ui.treeElement.removeChild(child);
         parentTreeElement.appendChild(child);
       }
