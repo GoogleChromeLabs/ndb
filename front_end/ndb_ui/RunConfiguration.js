@@ -15,17 +15,19 @@ Ndb.RunConfiguration = class extends UI.VBox {
   }
 
   async update() {
-    const service = await Ndb.serviceManager.create('npm_service');
-    const scripts = await service.call('run', {});
     const configurations = [];
     const main = Ndb.mainConfiguration();
     if (main)
       configurations.push(main);
-    this._items.replaceAll(configurations.concat(Object.keys(scripts).map(name => ({
-      name,
-      command: scripts[name],
-      commandToRun: `npm run ${name}`
-    }))));
+    if (NdbProcessInfo.pkg) {
+      const scripts = NdbProcessInfo.pkg.scripts || {};
+      this._items.replaceAll(configurations.concat(Object.keys(scripts).map(name => ({
+        name,
+        command: scripts[name],
+        execPath: NdbProcessInfo.npmExecPath,
+        args: ['run', name]
+      }))));
+    }
   }
 
   /**
@@ -48,15 +50,14 @@ Ndb.RunConfiguration = class extends UI.VBox {
     const buttons = f.$('controls-buttons');
     const toolbar = new UI.Toolbar('', buttons);
     const runButton = new UI.ToolbarButton(Common.UIString('Run'), 'largeicon-play');
-    runButton.addEventListener(UI.ToolbarButton.Events.Click, this._runConfig.bind(this, item.commandToRun));
+    runButton.addEventListener(UI.ToolbarButton.Events.Click, this._runConfig.bind(this, item.execPath, item.args));
     toolbar.appendToolbarItem(runButton);
     return f.element();
   }
 
-  async _runConfig(commandToRun) {
+  async _runConfig(execPath, args) {
     const manager = await Ndb.NodeProcessManager.instance();
-    const [execPath, ...args] = commandToRun.split(' ');
-    await manager.run(execPath, args);
+    await manager.debug(execPath, args);
   }
 
   /**

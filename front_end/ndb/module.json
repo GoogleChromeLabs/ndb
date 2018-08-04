@@ -14,6 +14,12 @@
         },
         {
             "type": "setting",
+            "settingName": "whitelistedModules",
+            "settingType": "string",
+            "defaultValue": ""
+        },
+        {
+            "type": "setting",
             "category": "Debugger",
             "title": "Wait at end",
             "settingName": "waitAtEnd",
@@ -37,6 +43,22 @@
             "defaultValue": true
         },
         {
+            "type": "action",
+            "actionId": "ndb.restart",
+            "className": "Ndb.RestartActionDelegate",
+            "title": "Restart last run configuration",
+            "bindings": [
+                {
+                    "platform": "windows,linux",
+                    "shortcut": "F5 Ctrl+R"
+                },
+                {
+                    "platform": "mac",
+                    "shortcut": "Meta+R"
+                }
+            ]
+        },
+        {
             "type": "@UI.ContextMenu.Provider",
             "contextTypes": [
                 "Workspace.UISourceCode"
@@ -44,8 +66,9 @@
             "className": "Ndb.ContextMenuProvider"
         }
     ],
-    "dependencies": ["common", "sdk"],
+    "dependencies": ["common", "sdk", "bindings"],
     "scripts": [
+        "FileSystemMapping.js",
         "NdbMain.js"
     ]
 }

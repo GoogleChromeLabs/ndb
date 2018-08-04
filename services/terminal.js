@@ -5,33 +5,46 @@
  */
 
 let pty;
+let error;
 try {
-  pty = require('node-pty-prebuilt');
+  pty = require('ndb-node-pty-prebuilt');
 } catch (e) {
+  error = e.stack;
 }
 
+const fs = require('fs');
+
 const {ServiceBase} = require('./service_base.js');
+
+const NDB_VERSION = require('../package.json').version;
 
 class Terminal extends ServiceBase {
   init(params) {
     if (!pty)
-      throw new Error('There were some errors with building terminal on this platform');
-    this._term = pty.spawn(process.platform === 'win32' ? 'cmd.exe' : 'bash', [], {
+      throw {message: error};
+    let shell = process.env.SHELL;
+    if (!shell || !fs.existsSync(shell))
+      shell = process.platform === 'win32' ? 'cmd.exe' : 'bash';
+    this._term = pty.spawn(shell, [], {
       name: 'xterm-color',
       cols: params.cols || 80,
       rows: params.rows || 24,
       cwd: process.cwd(),
       env: {
         ...process.env,
-        NODE_OPTIONS: `--require ${require.resolve('../node_debug_demon/preload.js')} --inspect=0`,
-        NDD_DEASYNC_JS: require.resolve('deasync'),
+        NODE_OPTIONS: `--require ${params.preload}`,
         NDD_STORE: params.nddStore,
-        NDD_WAIT_AT_START: 1
+        NDB_VERSION
       }
     });
 
     this._term.on('data', data => this._notify('data', {data}));
+    this._term.on('close', _ => this._notify('close'));
     return Promise.resolve({});
+  }
+
+  dispose() {
+    process.exit(0);
   }
 
   resize(params) {
