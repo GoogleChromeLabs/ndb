@@ -35,6 +35,7 @@ Ndb.NdbMain = class extends Common.Object {
         type: ''
       });
     });
+    Runtime.experiments.setEnabled('timelineTracingJSProfile', false);
   }
 
   async _startRepl() {
