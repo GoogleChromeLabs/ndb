@@ -42,7 +42,8 @@ Ndb.FileSystemMapping = class {
    * @return {?Workspace.UILocation}
    */
   rawLocationToUILocation(rawLocation) {
-    const sourceMap = this._compiledUrlToSourceMap.get(rawLocation.script().sourceURL);
+    const script = rawLocation.script();
+    const sourceMap = script ? this._compiledUrlToSourceMap.get(script.sourceURL) : null;
     if (sourceMap) {
       const entry = sourceMap.findEntry(rawLocation.lineNumber, rawLocation.columnNumber);
       if (entry) {
