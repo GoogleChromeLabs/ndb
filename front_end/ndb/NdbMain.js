@@ -565,3 +565,12 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
     return null;
   }
 };
+
+(function() {
+  const linkifyURL = Components.Linkifier.linkifyURL;
+  Components.Linkifier.linkifyURL = function(url, ...args) {
+    if (url && !url.startsWith('[eval'))
+      url = Common.ParsedURL.platformPathToURL(url);
+    return linkifyURL(url, ...args);
+  };
+})();
