@@ -22,10 +22,10 @@
   "license": "Apache-2.0",
   "dependencies": {
     "chokidar": "^2.0.4",
-    "chrome-devtools-frontend": "1.0.578928",
+    "chrome-devtools-frontend": "1.0.580747",
     "clipboardy": "^1.2.3",
     "fs-copy-file-sync": "^1.1.1",
-    "isbinaryfile": "^3.0.2",
+    "isbinaryfile": "^3.0.3",
     "mime": "^2.3.1",
     "opn": "^5.3.0",
     "puppeteer": "1.6.1",
