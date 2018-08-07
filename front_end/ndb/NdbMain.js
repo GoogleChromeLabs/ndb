@@ -24,9 +24,6 @@ Ndb.NdbMain = class extends Common.Object {
 
     this._startRepl();
 
-    Ndb.fileSystemMapping = new Ndb.FileSystemMapping();
-    Bindings.debuggerWorkspaceBinding.addSourceMapping(Ndb.fileSystemMapping);
-
     registerFileSystem('cwd', NdbProcessInfo.cwd).then(_ => {
       InspectorFrontendAPI.fileSystemAdded(undefined, {
         fileSystemName: 'cwd',
