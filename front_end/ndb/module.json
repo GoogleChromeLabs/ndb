@@ -68,7 +68,6 @@
     ],
     "dependencies": ["common", "sdk", "bindings"],
     "scripts": [
-        "FileSystemMapping.js",
         "NdbMain.js"
     ]
 }
