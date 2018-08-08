@@ -22,7 +22,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "chokidar": "^2.0.4",
-    "chrome-devtools-frontend": "1.0.581096",
+    "chrome-devtools-frontend": "1.0.581469",
     "clipboardy": "^1.2.3",
     "fs-copy-file-sync": "^1.1.1",
     "isbinaryfile": "^3.0.3",
