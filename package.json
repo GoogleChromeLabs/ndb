@@ -22,7 +22,6 @@
   "license": "Apache-2.0",
   "dependencies": {
     "chokidar": "^2.0.4",
-    "chrome-devtools-frontend": "1.0.581469",
     "clipboardy": "^1.2.3",
     "fs-copy-file-sync": "^1.1.1",
     "isbinaryfile": "^3.0.3",
@@ -38,6 +37,7 @@
     "ndb-node-pty-prebuilt": "^0.8.0"
   },
   "devDependencies": {
+    "chrome-devtools-frontend": "1.0.581469",
     "eslint": "^4.19.1",
     "mocha": "^5.2.0",
     "uglify-es": "^3.3.9"
