@@ -40,6 +40,6 @@
     "chrome-devtools-frontend": "1.0.582044",
     "eslint": "^4.19.1",
     "mocha": "^5.2.0",
-    "uglify-es": "^3.3.9"
+    "terser": "^3.8.1"
   }
 }
