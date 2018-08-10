@@ -20,10 +20,13 @@ const DEVTOOLS_DIR = path.dirname(
     await util.promisify(removeFolder)(outputPath);
   await util.promisify(fs.mkdir)(outputPath);
 
-  new ReleaseBuilder([
+  const builder = new ReleaseBuilder([
     path.join(__dirname, 'front_end'),
     DEVTOOLS_DIR,
     __dirname,
     path.join(__dirname, '..', '..')
-  ], outputPath).buildApp('ndb_app');
+  ], outputPath);
+  await builder.buildApp('ndb_app');
+  await builder.buildWorkerApp('heap_snapshot_worker');
+  await builder.buildWorkerApp('formatter_worker');
 })();
