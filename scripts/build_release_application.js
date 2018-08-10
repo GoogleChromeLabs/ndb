@@ -9,7 +9,7 @@ const path = require('path');
 const readline = require('readline');
 const util = require('util');
 
-const UglifyJS = require('uglify-es');
+const Terser = require("terser");
 
 const fsReadFile = util.promisify(fs.readFile);
 
@@ -17,7 +17,7 @@ const DEVTOOLS_DIR = path.dirname(
     require.resolve('chrome-devtools-frontend/front_end/shell.json'));
 
 function minify(code) {
-  return UglifyJS.minify(code, {
+  return Terser.minify(code, {
     mangle: false,
     ecma: 8,
     compress: false
@@ -69,7 +69,7 @@ class ReleaseBuilder {
     return content;
   }
 
-  async buildApp(name) {
+  async _loadApp(name) {
     const fullName = this._lookupFile(`${name}.json`);
     const descriptor = JSON.parse(await this._readFile(fullName));
     const modules = descriptor.modules;
@@ -113,12 +113,26 @@ class ReleaseBuilder {
         descriptor.condition = module.condition;
       return descriptor;
     })};
+    return app;
+  }
+
+  async buildWorkerApp(name) {
+    const app = await this._loadApp(name);
+    app.hasHTML = false;
+    await Promise.all([
+      this._buildAppScript(app),
+      this._buildDynamicScripts(app),
+    ]);
+  }
+
+  async buildApp(name) {
+    const app = await this._loadApp(name);
+    app.hasHTML = true;
     await Promise.all([
       this._buildHtml(app),
       this._buildAppScript(app),
       this._buildDynamicScripts(app),
     ]);
-
     await this._copyFile(this._lookupFile('favicon.ico'), path.join(this._output, 'favicon.ico'));
     await util.promisify(fs.mkdir)(path.join(this._output, 'Images'));
     await Promise.all(Array.from(this._images)
@@ -209,6 +223,13 @@ class ReleaseBuilder {
           .map(resource => path.join(module.name, resource)));
     }
     await this._writeResources(resources, output);
+    if (!app.hasHTML) {
+      try {
+        const jsFile = this._lookupFile(`${app.name}.js`);
+        await write(output, minify(await this._readFile(jsFile, 'utf8')));
+      } catch (e) {
+      }
+    }
     await new Promise(resolve => output.end(resolve));
     output.close();
   }
