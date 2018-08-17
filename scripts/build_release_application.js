@@ -9,7 +9,7 @@ const path = require('path');
 const readline = require('readline');
 const util = require('util');
 
-const UglifyJS = require('uglify-es');
+const Terser = require("terser");
 
 const fsReadFile = util.promisify(fs.readFile);
 
@@ -17,7 +17,7 @@ const DEVTOOLS_DIR = path.dirname(
     require.resolve('chrome-devtools-frontend/front_end/shell.json'));
 
 function minify(code) {
-  return UglifyJS.minify(code, {
+  return Terser.minify(code, {
     mangle: false,
     ecma: 8,
     compress: false
@@ -48,24 +48,43 @@ class ReleaseBuilder {
       'sdk_test_runner': 'SDKTestRunner',
       'cpu_profiler_test_runner': 'CPUProfilerTestRunner'
     };
+    this._images = new Set();
   }
 
-  async buildApp(name) {
+  async _copyFile(source, destination) {
+    if (fs.copyFile)
+      await util.promisify(fs.copyFile)(source, destination);
+    else
+      require('fs-copy-file-sync')(source, destination);
+  }
+
+  async _readFile(name) {
+    const content = await fsReadFile(name, 'utf8');
+    const re = /Images\/[a-zA-Z_.0-9]+/g;
+    const m = content.match(re);
+    if (m) {
+      for (const image of m)
+        this._images.add(image.split('/')[1]);
+    }
+    return content;
+  }
+
+  async _loadApp(name) {
     const fullName = this._lookupFile(`${name}.json`);
-    const descriptor = JSON.parse(await fsReadFile(fullName));
+    const descriptor = JSON.parse(await this._readFile(fullName));
     const modules = descriptor.modules;
     const app = { name };
     let extendsName = descriptor.extends;
     while (extendsName) {
       const fullName = this._lookupFile(`${extendsName}.json`);
-      const descriptor = JSON.parse(await fsReadFile(fullName));
+      const descriptor = JSON.parse(await this._readFile(fullName));
       modules.push(...descriptor.modules);
       extendsName = descriptor.extends;
     }
     const loadedModules = this._topologicalSort(
         await Promise.all(modules.map(async module => {
           const fullName = this._lookupFile(`${module.name}${path.sep}module.json`);
-          const descriptor = JSON.parse(await fsReadFile(fullName));
+          const descriptor = JSON.parse(await this._readFile(fullName));
           return {
             ...descriptor,
             ...module
@@ -94,18 +113,30 @@ class ReleaseBuilder {
         descriptor.condition = module.condition;
       return descriptor;
     })};
+    return app;
+  }
+
+  async buildWorkerApp(name) {
+    const app = await this._loadApp(name);
+    app.hasHTML = false;
+    await Promise.all([
+      this._buildAppScript(app),
+      this._buildDynamicScripts(app),
+    ]);
+  }
+
+  async buildApp(name) {
+    const app = await this._loadApp(name);
+    app.hasHTML = true;
     await Promise.all([
       this._buildHtml(app),
       this._buildAppScript(app),
       this._buildDynamicScripts(app),
     ]);
-    if (fs.copyFile) {
-      util.promisify(fs.copyFile)(this._lookupFile('favicon.ico'),
-          path.join(this._output, 'favicon.ico'));
-    } else {
-      require('fs-copy-file-sync')(this._lookupFile('favicon.ico'),
-          path.join(this._output, 'favicon.ico'));
-    }
+    await this._copyFile(this._lookupFile('favicon.ico'), path.join(this._output, 'favicon.ico'));
+    await util.promisify(fs.mkdir)(path.join(this._output, 'Images'));
+    await Promise.all(Array.from(this._images)
+      .map(image => this._copyFile(this._lookupFile(path.join('Images', image)), path.join(this._output, 'Images', image))));
   }
 
   _topologicalSort(modules) {
@@ -176,7 +207,7 @@ class ReleaseBuilder {
     const output = fs.createWriteStream(path.join(this._output, scriptName));
     await write(output, '/* Runtime.js */\n');
     const runtimeFullName = this._lookupFile(`Runtime.js`);
-    await write(output, minify(await fsReadFile(runtimeFullName, 'utf8')));
+    await write(output, minify(await this._readFile(runtimeFullName, 'utf8')));
     await write(output, `allDescriptors.push(...${JSON.stringify(app.releaseModuleDescriptors)});`);
     await write(output, `/* Application descriptor ${app.name} */`);
     await write(output, `applicationDescriptor = ${JSON.stringify(app.descriptor)}`);
@@ -192,6 +223,13 @@ class ReleaseBuilder {
           .map(resource => path.join(module.name, resource)));
     }
     await this._writeResources(resources, output);
+    if (!app.hasHTML) {
+      try {
+        const jsFile = this._lookupFile(`${app.name}.js`);
+        await write(output, minify(await this._readFile(jsFile, 'utf8')));
+      } catch (e) {
+      }
+    }
     await new Promise(resolve => output.end(resolve));
     output.close();
   }
@@ -209,7 +247,7 @@ class ReleaseBuilder {
     result += `\nself['${namespace}'] = self['${namespace}'] || {};\n`;
     result += (await Promise.all(module.scripts.map(async name => {
       const fullName = this._lookupFile(path.join(module.name,name));
-      return await fsReadFile(fullName, 'utf8');
+      return await this._readFile(fullName, 'utf8');
     }))).join('\n');
     return result;
   }
@@ -219,7 +257,7 @@ class ReleaseBuilder {
       return;
     await write(output, (await Promise.all(resources.map(async resource => {
       const fullName = this._lookupFile(resource);
-      let content = await fsReadFile(fullName, 'utf8');
+      let content = await this._readFile(fullName, 'utf8');
       content = content.replace(/\\/g, '\\\\');
       content = content.replace(/\n/g, '\\n');
       content = content.replace(/"/g, '\\"');

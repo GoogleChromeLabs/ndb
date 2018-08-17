@@ -1,6 +1,6 @@
 {
   "name": "ndb",
-  "version": "1.0.18",
+  "version": "1.0.23",
   "description": "Chrome DevTools for Node.js",
   "main": "ndb.js",
   "repository": "github:GoogleChromeLabs/ndb",
@@ -22,10 +22,9 @@
   "license": "Apache-2.0",
   "dependencies": {
     "chokidar": "^2.0.4",
-    "chrome-devtools-frontend": "1.0.578928",
     "clipboardy": "^1.2.3",
     "fs-copy-file-sync": "^1.1.1",
-    "isbinaryfile": "^3.0.2",
+    "isbinaryfile": "^3.0.3",
     "mime": "^2.3.1",
     "opn": "^5.3.0",
     "puppeteer": "1.6.1",
@@ -38,8 +37,9 @@
     "ndb-node-pty-prebuilt": "^0.8.0"
   },
   "devDependencies": {
+    "chrome-devtools-frontend": "1.0.582044",
     "eslint": "^4.19.1",
     "mocha": "^5.2.0",
-    "uglify-es": "^3.3.9"
+    "terser": "^3.8.1"
   }
 }

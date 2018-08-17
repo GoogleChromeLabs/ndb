@@ -17,10 +17,12 @@ Ndb.NdbMain = class extends Common.Object {
     Common.moduleSetting('blackboxAnythingOutsideCwd').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
     Common.moduleSetting('whitelistedModules').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
     Ndb.NdbMain._calculateBlackboxState();
-    this._startRepl();
 
-    Ndb.fileSystemMapping = new Ndb.FileSystemMapping();
-    Bindings.debuggerWorkspaceBinding.addSourceMapping(Ndb.fileSystemMapping);
+    // Create root Main target.
+    const stubConnection = new SDK.StubConnection({onMessage: _ => 0, onDisconnect: _ => 0});
+    SDK.targetManager.createTarget('<root>', '', 0, _ => stubConnection, null, false);
+
+    this._startRepl();
 
     registerFileSystem('cwd', NdbProcessInfo.cwd).then(_ => {
       InspectorFrontendAPI.fileSystemAdded(undefined, {
@@ -289,7 +291,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
     const processInfo = new Ndb.ProcessInfo(payload);
     this._processes.set(pid, processInfo);
 
-    const parentTarget = payload.ppid ? this._targetManager.targetById(payload.ppid) : null;
+    const parentTarget = payload.ppid ? this._targetManager.targetById(payload.ppid) : this._targetManager.mainTarget();
     const target = this._targetManager.createTarget(
         pid, processInfo.userFriendlyName(), SDK.Target.Capability.JS,
         this._createConnection.bind(this, pid),
@@ -469,8 +471,6 @@ Ndb.RestartActionDelegate = class {
     return false;
   }
 };
-
-SDK.targetManager.mainTarget = () => null;
 
 SDK.DebuggerModel.prototype.scheduleStepIntoAsync = function() {
   this._agent.scheduleStepIntoAsync();
