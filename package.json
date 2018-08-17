@@ -1,6 +1,6 @@
 {
   "name": "ndb",
-  "version": "1.0.6",
+  "version": "1.0.18",
   "description": "Chrome DevTools for Node.js",
   "main": "ndb.js",
   "repository": "github:GoogleChromeLabs/ndb",
@@ -13,31 +13,33 @@
   },
   "scripts": {
     "lint": "./node_modules/.bin/eslint .",
-    "postinstall": "node install.js",
+    "prepare": "node build.js",
     "dummyScriptForTest": "node -e 'console.log(239)'",
-    "unit": "./node_modules/mocha/bin/mocha test/test.js"
+    "unit": "./node_modules/mocha/bin/mocha test/test.js",
+    "integration": "node test/integration.js"
   },
   "author": "The Chromium Authors",
   "license": "Apache-2.0",
   "dependencies": {
-    "chrome-devtools-frontend": "1.0.576743",
+    "chokidar": "^2.0.4",
+    "chrome-devtools-frontend": "1.0.578928",
     "clipboardy": "^1.2.3",
-    "deasync": "^0.1.13",
+    "fs-copy-file-sync": "^1.1.1",
     "isbinaryfile": "^3.0.2",
     "mime": "^2.3.1",
     "opn": "^5.3.0",
-    "puppeteer": "^1.6.0",
+    "puppeteer": "1.6.1",
     "rimraf": "^2.6.2",
-    "uglify-es": "^3.3.10",
     "update-notifier": "^2.5.0",
-    "ws": "^5.2.2",
+    "ws": "^6.0.0",
     "xterm": "^3.5.1"
   },
   "optionalDependencies": {
-    "node-pty-prebuilt": "^0.7.3"
+    "ndb-node-pty-prebuilt": "^0.8.0"
   },
   "devDependencies": {
     "eslint": "^4.19.1",
-    "mocha": "^5.2.0"
+    "mocha": "^5.2.0",
+    "uglify-es": "^3.3.9"
   }
 }

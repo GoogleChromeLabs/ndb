@@ -12,6 +12,9 @@ Ndb.Terminal = class extends UI.VBox {
     this._term = null;
     this._service = null;
 
+    this._buffer = '';
+    this._ready = false;
+
     this._terminalShownCallback = null;
     this._terminalPromise = new Promise(resolve => this._terminalShownCallback = resolve);
     this._init();
@@ -19,27 +22,46 @@ Ndb.Terminal = class extends UI.VBox {
 
   async _init() {
     this._service = await Ndb.serviceManager.create('terminal');
-    const nddStore = await (await Ndb.NodeProcessManager.instance()).nddStore();
     await this._terminalPromise;
     this._terminal.on('resize', size => this._service.call('resize', {cols: size.cols, rows: size.rows}));
-    this._terminal.on('data', data => this._service.call('write', {data: data}));
-    this._service.addEventListener(Ndb.Service.Events.Notification, this._onNotification.bind(this));
-    const success = !!await this._service.call('init', {
-      cols: this._terminal.cols,
-      rows: this._terminal.rows,
-      nddStore: nddStore
+    this._terminal.on('data', data => {
+      if (this._ready)
+        this._service.call('write', {data: data});
+      else
+        this._buffer += data;
     });
-    if (!success)
-      this._showInitError();
+    this._service.addEventListener(Ndb.Service.Events.Notification, this._onNotification.bind(this));
+    this._initService();
   }
 
   _onNotification({data: {name, params}}) {
     if (name === 'data')
       this._terminal.write(params.data);
+    if (name === 'close')
+      this._initService();
   }
 
-  _showInitError() {
+  async _initService() {
+    this._ready = false;
+    const nddStore = await (await Ndb.NodeProcessManager.instance()).nddStore();
+    const {error} = await this._service.call('init', {
+      cols: this._terminal.cols,
+      rows: this._terminal.rows,
+      nddStore: nddStore,
+      preload: NdbProcessInfo.preload
+    });
+    this._ready = true;
+    if (this._buffer.length) {
+      this._service.call('write', {data: this._buffer});
+      this._buffer = '';
+    }
+    if (error)
+      this._showInitError(error);
+  }
+
+  _showInitError(error) {
     this.contentElement.removeChildren();
+    this.contentElement.createChild('div').textContent = error;
   }
 
   wasShown() {

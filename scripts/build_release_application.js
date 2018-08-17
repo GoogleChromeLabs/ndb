@@ -24,6 +24,15 @@ function minify(code) {
   }).code;
 }
 
+async function write(stream, data) {
+  let callback;
+  const promise = new Promise(resolve => callback = resolve);
+  const success = stream.write(data, 'utf8', callback);
+  if (!success)
+    await new Promise(resolve => stream.once('drain', resolve));
+  return promise;
+}
+
 class ReleaseBuilder {
   constructor(path, output) {
     this._path = path;
@@ -89,9 +98,14 @@ class ReleaseBuilder {
       this._buildHtml(app),
       this._buildAppScript(app),
       this._buildDynamicScripts(app),
-      util.promisify(fs.copyFile)(this._lookupFile('favicon.ico'),
-          path.join(this._output, 'favicon.ico'))
     ]);
+    if (fs.copyFile) {
+      util.promisify(fs.copyFile)(this._lookupFile('favicon.ico'),
+          path.join(this._output, 'favicon.ico'));
+    } else {
+      require('fs-copy-file-sync')(this._lookupFile('favicon.ico'),
+          path.join(this._output, 'favicon.ico'));
+    }
   }
 
   _topologicalSort(modules) {
@@ -140,34 +154,37 @@ class ReleaseBuilder {
       input: fs.createReadStream(htmlFullName, {encoding: 'utf8'}),
       crlfDelay: Infinity
     });
+    const outputLines = [];
     rl.on('line', line => {
       if (line.includes('<script ') || line.includes('<link '))
         return;
       if (line.includes('</head>')) {
-        output.write(`    <script type="text/javascript" src="${app.name}.js"></script>\n`);
-        output.write(`    <script>${minify(jsContent)}</script>\n`);
+        outputLines.push(`    <script type="text/javascript" src="${app.name}.js"></script>\n`);
+        outputLines.push(`    <script>${minify(jsContent)}</script>\n`);
       }
-      output.write(`${line}\n`);
+      outputLines.push(`${line}\n`);
     });
     await new Promise(resolve => rl.on('close', resolve));
     rl.close();
+    for (const line of outputLines)
+      await write(output, line);
     output.close();
   }
 
   async _buildAppScript(app) {
     const scriptName = `${app.name}.js`;
     const output = fs.createWriteStream(path.join(this._output, scriptName));
-    output.write('/* Runtime.js */\n');
+    await write(output, '/* Runtime.js */\n');
     const runtimeFullName = this._lookupFile(`Runtime.js`);
-    output.write(minify(await fsReadFile(runtimeFullName, 'utf8')));
-    output.write(`allDescriptors.push(...${JSON.stringify(app.releaseModuleDescriptors)});`);
-    output.write(`/* Application descriptor ${app.name} */`);
-    output.write(`applicationDescriptor = ${JSON.stringify(app.descriptor)}`);
-    output.write('/* Autostart modules */;\n');
+    await write(output, minify(await fsReadFile(runtimeFullName, 'utf8')));
+    await write(output, `allDescriptors.push(...${JSON.stringify(app.releaseModuleDescriptors)});`);
+    await write(output, `/* Application descriptor ${app.name} */`);
+    await write(output, `applicationDescriptor = ${JSON.stringify(app.descriptor)}`);
+    await write(output, '/* Autostart modules */;\n');
     let content = (await Promise.all(app.autoStartModules.map(module => this._writeScripts(module)))).join('\n');
     content = minify(content);
-    output.write(content);
-    output.write(';\n/* Autostart resources */\n');
+    await write(output, content);
+    await write(output, ';\n/* Autostart resources */\n');
     const resources = [];
     for (const module of app.autoStartModules) {
       if (!module.resources) continue;
@@ -200,7 +217,7 @@ class ReleaseBuilder {
   async _writeResources(resources, output) {
     if (!resources)
       return;
-    output.write((await Promise.all(resources.map(async resource => {
+    await write(output, (await Promise.all(resources.map(async resource => {
       const fullName = this._lookupFile(resource);
       let content = await fsReadFile(fullName, 'utf8');
       content = content.replace(/\\/g, '\\\\');
@@ -217,7 +234,7 @@ class ReleaseBuilder {
         await util.promisify(fs.mkdir)(folder);
       const output = fs.createWriteStream(
           path.join(folder, `${module.name}_module.js`));
-      output.write(minify(await this._writeScripts(module)));
+      await write(output, minify(await this._writeScripts(module)));
       if (module.resources) {
         await this._writeResources(
             module.resources.map(resource => path.join(module.name, resource)), output);

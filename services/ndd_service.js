@@ -5,170 +5,153 @@
  */
 
 const {spawn} = require('child_process');
+const chokidar = require('chokidar');
 const fs = require('fs');
+const http = require('http');
 const os = require('os');
 const path = require('path');
-const removeFolder = require('rimraf');
 const util = require('util');
-
 const WebSocket = require('ws');
 
-const {Client} = require('../node_debug_demon/client.js');
 const {ServiceBase} = require('./service_base.js');
 
-const wsSymbol = Symbol('WebSocket');
+const NDB_VERSION = require('../package.json').version;
+
+const fsMkdtemp = util.promisify(fs.mkdtemp);
+const fsReadFile = util.promisify(fs.readFile);
+const removeFolder = util.promisify(require('rimraf'));
 
 class NddService extends ServiceBase {
   constructor() {
     super();
     this._nddStore = '';
-    this._useTemporaryNddStore = false;
-    this._nddClient = null;
-    this._onAddedListener = this._onAdded.bind(this);
-    this._onFinishedListener = this._onFinished.bind(this);
-
-    this._cleanupInterval = null;
-
-    this._instances = new Map();
+    this._nddStoreWatcher = null;
+    this._running = new Set();
+    this._sockets = new Map();
   }
 
-  async start({nddStore, cleanupInterval}) {
-    if (this._nddClient)
-      return;
-    this._useTemporaryNddStore = !nddStore;
-    this._nddStore = nddStore || await util.promisify(fs.mkdtemp)(path.join(os.tmpdir(), 'ndb-'));
-    this._nddClient = new Client(this._nddStore);
-    this._nddClient.on('added', this._onAddedListener);
-    this._nddClient.on('finished', this._onFinishedListener);
-    await this._nddClient.start();
-    this._cleanupInterval = setInterval(() => this._nddClient.cleanup(), cleanupInterval || 1000);
-  }
-
-  async nddStore() {
-    if (!this._nddClient)
-      throw 'NddService should be started first';
+  async init() {
+    this._nddStore = await fsMkdtemp(path.join(os.tmpdir(), 'ndb-'));
+    this._nddStoreWatcher = chokidar.watch(this._nddStore, {
+      awaitWriteFinish: {
+        stabilityThreshold: 500,
+        pollInterval: 100
+      },
+      cwd: this._nddStore,
+      depth: 0
+    });
+    this._nddStoreWatcher.on('add', this._onAdded.bind(this));
+    this._nddStoreWatcher.on('unlink', id => this._running.delete(id));
     return this._nddStore;
   }
 
-  async stop() {
-    if (!this._nddClient)
-      return;
-    await this._nddClient.dispose();
-    this._nddClient.removeListener('added', this._onAddedListener);
-    this._nddClient.removeListener('finished', this._onFinishedListener);
-    this._instances.clear();
-    if (this._useTemporaryNddStore)
-      await util.promisify(removeFolder)(this._nddStore);
+  async _onAdded(id) {
+    this._running.add(id);
+    try {
+      const info = JSON.parse(await fsReadFile(path.join(this._nddStore, id), 'utf8'));
+      const {webSocketDebuggerUrl} = (await this._fetch(info.targetListUrl))[0];
+      const ws = new WebSocket(webSocketDebuggerUrl);
+      ws.on('error', _ => 0);
+      ws.once('open', _ => {
+        this._sockets.set(id, ws);
+        this._notify('added', {...info, id});
+      });
+      ws.on('message', message => this._notify('message', {message, id}));
+      ws.once('close', _ => {
+        this._sockets.delete(id);
+        this._notify('disconnected', {id});
+      });
+    } catch (e) {
+    }
+  }
 
-    if (this._cleanupInterval)
-      clearInterval(this._cleanupInterval);
+  async disconnect({id}) {
+    const ws = this._sockets.get(id);
+    if (ws)
+      ws.close();
+  }
+
+  async send({id, message}) {
+    const ws = this._sockets.get(id);
+    if (ws)
+      return new Promise(resolve => ws.send(message, resolve));
+  }
+
+  async _fetch(url) {
+    return new Promise(resolve => {
+      http.get(url, res => {
+        if (res.statusCode !== 200) {
+          res.resume();
+          resolve(null);
+        } else {
+          res.setEncoding('utf8');
+          let buffer = '';
+          res.on('data', data => buffer += data);
+          res.on('end', _ => {
+            try {
+              resolve(JSON.parse(buffer));
+            } catch (e) {
+              resolve(null);
+            }
+          });
+        }
+      }).on('error', _ => resolve(null));
+    });
   }
 
   async dispose() {
-    await this.stop();
-    process.exit(0);
-  }
-
-  async attach({instanceId}) {
-    if (!this._nddClient)
-      throw 'NddService should be started first';
-    const instance = this._instances.get(instanceId);
-    if (!instance)
-      throw 'No instance with given id';
-    if (instance[wsSymbol])
-      throw 'Already attached to instance with given id';
-
-    const {url} = await instance.fetchInfo();
-    const ws = new WebSocket(url);
-    ws.on('error', error => ws.close());
-    ws.on('close', (a,b,c) => {
-      if (!instance[wsSymbol])
-        return;
-      this._notify('detached', {
-        instanceId: instance.id()
-      });
-      delete instance[wsSymbol];
-    });
-    ws.on('open', _ => {
-      instance[wsSymbol] = ws;
-      this._notify('attached', {instanceId: instance.id()});
-    });
-    ws.on('message', message => {
-      this._notify('message', {
-        instanceId: instance.id(),
-        message
-      });
-    });
-  }
-
-  async detach({instanceId}) {
-    if (!this._nddClient)
-      throw 'NddService should be started first';
-    const instance = this._instances.get(instanceId);
-    if (!instance)
-      throw 'No instance with given id';
-    if (!instance[wsSymbol])
-      throw 'Instance is not attached';
-    instance[wsSymbol].close();
-  }
-
-  async sendMessage({instanceId, message}) {
-    if (!this._nddClient)
-      throw 'NddService should be started first';
-    const instance = this._instances.get(instanceId);
-    if (!instance)
-      throw 'No instance with given id';
-    if (!instance[wsSymbol])
-      throw 'Not attached to instance with given id';
-    instance[wsSymbol].send(message);
-  }
-
-  async run({execPath, args, options}) {
-    if (this._nddStore !== process.env.NDD_STORE) {
-      options = {
-        waitAtStart: false,
-        ...options
-      };
+    try {
+      for (const id of this._running)
+        process.kill(id, 'SIGKILL');
+      this._running.clear();
+      if (this._nddStoreWatcher) {
+        this._nddStoreWatcher.close();
+        this._nddStoreWatcher = null;
+        await removeFolder(this._nddStore);
+        this._nddStore = '';
+      }
+    } catch (e) {
+    } finally {
+      process.exit(0);
     }
+  }
+
+  async debug({execPath, args, options}) {
     const env = {
-      NODE_OPTIONS: `--require ${require.resolve('../node_debug_demon/preload.js')} --inspect=0`,
+      NODE_OPTIONS: `--require ${options.preload}`,
       NDD_STORE: this._nddStore,
-      NDD_DEASYNC_JS: require.resolve('deasync')
+      NDB_VERSION
     };
-    if (options && options.waitAtStart)
-      env.NDD_WAIT_AT_START = 1;
-    if (options && options.groupId)
-      env.NDD_GROUP_ID = options.groupId;
-    if (options.doNotInheritEnv)
-      spawn(execPath, args, { env, stdio: 'inherit' });
-    else
-      spawn(execPath, args, { shell: os.platform() === 'win32', env: { ...process.env, ...env }, stdio: 'inherit' });
-  }
-
-  async kill({instanceId}) {
-    if (!this._nddClient)
-      throw 'NddService should be started first';
-    const instance = this._instances.get(instanceId);
-    if (!instance)
-      throw 'No instance with given id';
-    await instance.kill();
-  }
-
-  async _onAdded(instance) {
-    this._instances.set(instance.id(), instance);
-    this._notify('added', {
-      ...await instance.fetchInfo(),
-      instanceId: instance.id()
+    if (options && options.data)
+      env.NDD_DATA = options.data;
+    const p = spawn(execPath, args, {
+      cwd: options.cwd,
+      env: { ...process.env, ...env },
+      stdio: ['inherit', 'inherit', 'pipe']
     });
+    const filter = [
+      Buffer.from('Debugger listening on', 'utf8'),
+      Buffer.from('Waiting for the debugger to disconnect...', 'utf8'),
+      Buffer.from('Debugger attached.', 'utf8')
+    ];
+    p.stderr.on('data', data => {
+      for (const prefix of filter) {
+        if (Buffer.compare(data.slice(0, prefix.length), prefix) === 0)
+          return;
+      }
+      process.stderr.write(data);
+    });
+    return new Promise((resolve, reject) => {
+      p.on('exit', code => resolve(code));
+      p.on('error', error => reject(error));
+    }).then(_ => fs.unlink(path.join(this._nddStore, String(p.pid)), err => 0));
   }
 
-  _onFinished(instance) {
-    this._instances.delete(instance.id());
-    if (instance[wsSymbol])
-      instance[wsSymbol].close();
-    this._notify('finished', {
-      instanceId: instance.id()
-    });
+  async kill({id}) {
+    if (!this._running.has(id))
+      return;
+    process.kill(id, 'SIGKILL');
+    fs.unlink(path.join(this._nddStore, id), _ => 0);
   }
 }
 

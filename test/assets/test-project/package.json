@@ -1,0 +1,14 @@
+{
+  "name": "test-project",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "run": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "run-module": "node --experimental-modules index.mjs",
+    "run-module-without-flag": "node index.mjs",
+    "atexit": "node -e \"process.once('exit', _ => console.log(42))\""
+  },
+  "keywords": []
+}

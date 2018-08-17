@@ -13,6 +13,13 @@ Sources.SourcesPanel.instance()._showThreadsIfNeeded = function() {
   }
 };
 Sources.SourcesPanel.instance()._showThreadsIfNeeded();
+Ndb.NodeProcessManager.instance().then(instance => {
+  if (!Common.moduleSetting('autoStartMain').get())
+    return;
+  const main = Ndb.mainConfiguration();
+  if (main)
+    instance.debug(main.execPath, main.args);
+});
 
 UI.context.addFlavorChangeListener(SDK.DebuggerPausedDetails, _ => {
   const details = UI.context.flavor(SDK.DebuggerPausedDetails);
@@ -29,13 +36,15 @@ Ndb.NodeProcesses = class extends UI.VBox {
     this._pauseAtStartCheckbox = new UI.ToolbarSettingCheckbox(
         Common.moduleSetting('pauseAtStart'), Common.UIString('Pause at start'),
         Common.UIString('Pause at start'));
+    this._pauseAtStartCheckbox.element.id = 'pause-at-start-checkbox';
     toolbar.appendToolbarItem(this._pauseAtStartCheckbox);
     this._waitAtEndCheckbox = new UI.ToolbarSettingCheckbox(
-        Common.moduleSetting('waitAtEnd'), Common.UIString('Wait for manual disconnect'),
-        Common.UIString('Wait at end'));
+        Common.moduleSetting('waitAtEnd'), Common.UIString('Stay attached when process is finished.'),
+        Common.UIString('Stay attached'));
     toolbar.appendToolbarItem(this._waitAtEndCheckbox);
 
     this._emptyElement = this.contentElement.createChild('div', 'gray-info-message');
+    this._emptyElement.id = 'no-running-nodes-msg';
     this._emptyElement.textContent = Common.UIString('No running nodes');
 
     this._treeOutline = new UI.TreeOutlineInShadow();
@@ -43,29 +52,22 @@ Ndb.NodeProcesses = class extends UI.VBox {
     this.contentElement.appendChild(this._treeOutline.element);
     this._treeOutline.element.classList.add('hidden');
 
-    this._instanceToUI = new Map();
-
-    Ndb.NodeProcessManager.instance().then(manager => {
-      this._manager = manager;
-      this._manager.addEventListener(Ndb.NodeProcessManager.Events.Added, this._onProcessAdded, this);
-      this._manager.addEventListener(Ndb.NodeProcessManager.Events.Finished, this._onProcessFinished, this);
-      this._manager.addEventListener(Ndb.NodeProcessManager.Events.Attached, this._onAttached, this);
-      this._manager.addEventListener(Ndb.NodeProcessManager.Events.Detached, this._onDetached, this);
-      UI.context.addFlavorChangeListener(SDK.Target, this._targetFlavorChanged, this);
-      for (const instance of this._manager.existingInstances())
-        this._onProcessAdded({data: instance});
-    });
+    this._targetToUI = new Map();
+    SDK.targetManager.observeTargets(this);
   }
 
   /**
-   * @param {!Ndb.NodeProcess} instance
+   * @override
+   * @param {!SDK.Target} target
    */
-  _onProcessAdded({data: instance}) {
-    if (instance.isRepl())
+  async targetAdded(target) {
+    const processManager = await Ndb.NodeProcessManager.instance();
+    const processInfo = processManager.infoForTarget(target);
+    if (!processInfo || processInfo.isRepl())
       return;
     const f = UI.Fragment.build`
       <div class=process-item>
-        <div class=process-title>${instance.userFriendlyName()}</div>
+        <div class=process-title>${processInfo.userFriendlyName()}</div>
         <div $=state class=process-item-state></div>
       </div>
       <div class='controls-container fill'>
@@ -73,85 +75,67 @@ Ndb.NodeProcesses = class extends UI.VBox {
         <div $=controls-buttons class=controls-buttons></div>
       </div>
     `;
-    f.$('state').textContent = instance.target() ? 'attached' : 'detached';
+    const debuggerModel = target.model(SDK.DebuggerModel);
+    debuggerModel.addEventListener(SDK.DebuggerModel.Events.DebuggerPaused, () => {
+      f.$('state').textContent = 'paused';
+    });
+    debuggerModel.addEventListener(SDK.DebuggerModel.Events.DebuggerResumed, () => {
+      f.$('state').textContent = 'attached';
+    });
+    f.$('state').textContent = 'attached';
 
     const buttons = f.$('controls-buttons');
     const toolbar = new UI.Toolbar('', buttons);
     const runButton = new UI.ToolbarButton(Common.UIString('Kill'), 'largeicon-terminate-execution');
-    runButton.addEventListener(UI.ToolbarButton.Events.Click, this._killInstance.bind(this, instance));
+    runButton.addEventListener(UI.ToolbarButton.Events.Click, _ => processManager.kill(target));
     toolbar.appendToolbarItem(runButton);
 
     const treeElement = new UI.TreeElement(f.element());
     treeElement.onselect = _ => {
-      if (UI.context.flavor(SDK.Target) !== instance.target())
-        UI.context.setFlavor(SDK.Target, instance.target());
+      if (UI.context.flavor(SDK.Target) !== target)
+        UI.context.setFlavor(SDK.Target, target);
     };
 
     let parentTreeElement = this._treeOutline.rootElement();
-    if (instance.parent()) {
-      const parentUI = this._instanceToUI.get(instance.parent());
+    if (target.parentTarget()) {
+      const parentUI = this._targetToUI.get(target.parentTarget());
       if (parentUI)
         parentTreeElement = parentUI.treeElement;
     }
     parentTreeElement.appendChild(treeElement);
     parentTreeElement.expand();
 
-    if (!this._instanceToUI.size) {
+    if (!this._targetToUI.size) {
       this._emptyElement.classList.add('hidden');
       this._treeOutline.element.classList.remove('hidden');
     }
-    this._instanceToUI.set(instance, {treeElement, f});
-  }
-
-  _killInstance(instance) {
-    this._manager.kill(instance);
+    this._targetToUI.set(target, {treeElement, f});
   }
 
   /**
-   * @param {!Ndb.NodeProcess} instance
+   * @override
+   * @param {!SDK.Target} target
    */
-  _onProcessFinished({data: instance}) {
-    const ui = this._instanceToUI.get(instance);
+  targetRemoved(target) {
+    const ui = this._targetToUI.get(target);
     if (ui) {
       const parentTreeElement = ui.treeElement.parent;
-      for (const child of ui.treeElement.children()) {
+      for (const child of ui.treeElement.children().slice()) {
         ui.treeElement.removeChild(child);
         parentTreeElement.appendChild(child);
       }
       parentTreeElement.removeChild(ui.treeElement);
-      this._instanceToUI.delete(instance);
+      this._targetToUI.delete(target);
     }
-    if (!this._instanceToUI.size) {
+    if (!this._targetToUI.size) {
       this._emptyElement.classList.remove('hidden');
       this._treeOutline.element.classList.add('hidden');
     }
   }
 
-  _onAttached({data: instance}) {
-    const ui = this._instanceToUI.get(instance);
-    if (!ui)
-      return;
-
-    const debuggerModel = instance.target().model(SDK.DebuggerModel);
-    debuggerModel.addEventListener(SDK.DebuggerModel.Events.DebuggerPaused, () => {
-      ui.f.$('state').textContent = 'paused';
-    });
-    debuggerModel.addEventListener(SDK.DebuggerModel.Events.DebuggerResumed, () => {
-      ui.f.$('state').textContent = 'attached';
-    });
-    ui.f.$('state').textContent = 'attached';
-  }
-
-  _onDetached({data: instance}) {
-    const ui = this._instanceToUI.get(instance);
-    if (ui)
-      ui.f.$('state').textContent = 'detached';
-  }
-
   _targetFlavorChanged({data: target}) {
-    for (const [instance, {treeElement}] of this._instanceToUI) {
-      if (instance.target() === target)
-        treeElement.select();
-    }
+    const treeElement = this._targetToUI.get(target);
+    if (treeElement)
+      treeElement.select();
   }
 };
