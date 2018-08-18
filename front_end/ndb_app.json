@@ -2,7 +2,8 @@
   "modules" : [
      { "name": "ndb", "type": "autostart" },
      { "name": "js_profiler" },
-     { "name": "ndb_ui" }
+     { "name": "ndb_ui" },
+     { "name": "cloud_debug" }
  ],
   "extends": "shell",
   "has_html": true

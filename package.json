@@ -21,6 +21,7 @@
   "author": "The Chromium Authors",
   "license": "Apache-2.0",
   "dependencies": {
+    "@google-cloud/debug-proxy-common": "^0.2.1",
     "chokidar": "^2.0.4",
     "clipboardy": "^1.2.3",
     "fs-copy-file-sync": "^1.1.1",

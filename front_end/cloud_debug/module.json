@@ -1,0 +1,29 @@
+{
+  "extensions": [
+      {
+          "type": "late-initialization",
+          "className": "Ndb.CloudDebugMain"
+      },
+      {
+          "type": "view",
+          "location": "sources-sidebar",
+          "id": "ndb.cloudDebuggees",
+          "title": "Cloud Debuggees",
+          "persistence": "permanent",
+          "className": "Ndb.CloudDebuggees"
+      },
+      {
+          "type": "view",
+          "location": "sources-sidebar",
+          "id": "ndb.snapshotExplorer",
+          "title": "Snapshot Explorer",
+          "persistence": "permanent",
+          "className": "Ndb.SnapshotExplorer"
+      }
+  ],
+  "scripts": [
+      "CloudDebugMain.js",
+      "CloudDebuggees.js",
+      "SnapshotExplorer.js"
+  ]
+}
