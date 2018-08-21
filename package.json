@@ -31,13 +31,13 @@
     "rimraf": "^2.6.2",
     "update-notifier": "^2.5.0",
     "ws": "^6.0.0",
-    "xterm": "^3.5.1"
+    "xterm": "^3.6.0"
   },
   "optionalDependencies": {
     "ndb-node-pty-prebuilt": "^0.8.0"
   },
   "devDependencies": {
-    "chrome-devtools-frontend": "1.0.582044",
+    "chrome-devtools-frontend": "^1.0.584299",
     "eslint": "^4.19.1",
     "mocha": "^5.2.0",
     "terser": "^3.8.1"
