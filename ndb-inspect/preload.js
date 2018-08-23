@@ -14,6 +14,7 @@ try {
   const nddStore = process.env.NDD_STORE;
   const nddParentProcessId = process.env.NDD_PPID;
   const nddData = process.env.NDD_DATA;
+  const nddWaitForConnection = process.env.NDD_WAIT_FOR_CONNECTION;
 
   process.env.NDD_PPID = process.pid;
   process.once('exit', _ => fs.unlinkSync(stateFileName));
@@ -46,7 +47,7 @@ try {
   }));
 
   inspector.close();
-  inspector.open(port, undefined, true);
+  inspector.open(port, undefined, nddWaitForConnection !== '0');
   delete process.breakAtStart;
 } catch (e) {
 }

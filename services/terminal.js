@@ -34,6 +34,7 @@ class Terminal extends ServiceBase {
         ...process.env,
         NODE_OPTIONS: `--require ${params.preload}`,
         NDD_STORE: params.nddStore,
+        NDD_WAIT_FOR_CONNECTION: 1,
         NDB_VERSION
       }
     });

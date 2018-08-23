@@ -9,7 +9,7 @@ const path = require('path');
 const readline = require('readline');
 const util = require('util');
 
-const Terser = require("terser");
+const Terser = require('terser');
 
 const fsReadFile = util.promisify(fs.readFile);
 
@@ -136,7 +136,7 @@ class ReleaseBuilder {
     await this._copyFile(this._lookupFile('favicon.ico'), path.join(this._output, 'favicon.ico'));
     await util.promisify(fs.mkdir)(path.join(this._output, 'Images'));
     await Promise.all(Array.from(this._images)
-      .map(image => this._copyFile(this._lookupFile(path.join('Images', image)), path.join(this._output, 'Images', image))));
+        .map(image => this._copyFile(this._lookupFile(path.join('Images', image)), path.join(this._output, 'Images', image))));
   }
 
   _topologicalSort(modules) {
