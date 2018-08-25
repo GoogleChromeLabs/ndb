@@ -7,9 +7,11 @@
 const {spawn} = require('child_process');
 const chokidar = require('chokidar');
 const fs = require('fs');
+const http = require('http');
 const os = require('os');
 const path = require('path');
 const util = require('util');
+const WebSocket = require('ws');
 
 const {ServiceBase} = require('./service_base.js');
 
@@ -25,6 +27,7 @@ class NddService extends ServiceBase {
     this._nddStore = '';
     this._nddStoreWatcher = null;
     this._running = new Set();
+    this._sockets = new Map();
   }
 
   async init() {
@@ -46,9 +49,54 @@ class NddService extends ServiceBase {
     this._running.add(id);
     try {
       const info = JSON.parse(await fsReadFile(path.join(this._nddStore, id), 'utf8'));
-      this._notify('added', {...info, id});
+      const {webSocketDebuggerUrl} = (await this._fetch(info.targetListUrl))[0];
+      const ws = new WebSocket(webSocketDebuggerUrl);
+      ws.on('error', _ => 0);
+      ws.once('open', _ => {
+        this._sockets.set(id, ws);
+        this._notify('added', {...info, id});
+      });
+      ws.on('message', message => this._notify('message', {message, id}));
+      ws.once('close', _ => {
+        this._sockets.delete(id);
+        this._notify('disconnected', {id});
+      });
     } catch (e) {
     }
+  }
+
+  async disconnect({id}) {
+    const ws = this._sockets.get(id);
+    if (ws)
+      ws.close();
+  }
+
+  async send({id, message}) {
+    const ws = this._sockets.get(id);
+    if (ws)
+      return new Promise(resolve => ws.send(message, resolve));
+  }
+
+  async _fetch(url) {
+    return new Promise(resolve => {
+      http.get(url, res => {
+        if (res.statusCode !== 200) {
+          res.resume();
+          resolve(null);
+        } else {
+          res.setEncoding('utf8');
+          let buffer = '';
+          res.on('data', data => buffer += data);
+          res.on('end', _ => {
+            try {
+              resolve(JSON.parse(buffer));
+            } catch (e) {
+              resolve(null);
+            }
+          });
+        }
+      }).on('error', _ => resolve(null));
+    });
   }
 
   async dispose() {
@@ -103,7 +151,7 @@ class NddService extends ServiceBase {
     if (!this._running.has(id))
       return;
     process.kill(id, 'SIGKILL');
-    fs.unlink(path.join(this._nddStore, id), err => 0);
+    fs.unlink(path.join(this._nddStore, id), _ => 0);
   }
 }
 

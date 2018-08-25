@@ -17,8 +17,13 @@ Ndb.NdbMain = class extends Common.Object {
     Common.moduleSetting('blackboxAnythingOutsideCwd').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
     Common.moduleSetting('whitelistedModules').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
     Ndb.NdbMain._calculateBlackboxState();
+
+    // Create root Main target.
+    const stubConnection = new SDK.StubConnection({onMessage: _ => 0, onDisconnect: _ => 0});
+    SDK.targetManager.createTarget('<root>', '', 0, _ => stubConnection, null, false);
+
     this._startRepl();
-    Ndb.sourceMapManager = new Ndb.SourceMapManager();
+
     registerFileSystem('cwd', NdbProcessInfo.cwd).then(_ => {
       InspectorFrontendAPI.fileSystemAdded(undefined, {
         fileSystemName: 'cwd',
@@ -141,85 +146,6 @@ Ndb.mainConfiguration = () => {
   };
 };
 
-class SourceMappableState extends Bindings.BreakpointManager.Breakpoint.State {
-  constructor(url, scriptId, scriptHash, lineNumber, columnNumber, condition) {
-    super(url, scriptId, scriptHash, lineNumber, columnNumber, condition);
-    if (!scriptId && !scriptHash && url) {
-      const sourceMap = Ndb.sourceMapManager.sourceMap(url);
-      if (sourceMap) {
-        const entry = sourceMap.sourceLineMapping(url, lineNumber, columnNumber);
-        if (entry) {
-          this.url = sourceMap.compiledURL();
-          this.lineNumber = entry.lineNumber;
-          this.columnNumber = entry.columnNumber;
-        }
-      }
-    }
-  }
-}
-
-Bindings.BreakpointManager.Breakpoint.State = SourceMappableState;
-
-Ndb.SourceMapManager = class {
-  constructor() {
-    this._manager = new SDK.SourceMapManager({
-      inspectedURL: _ => Common.ParsedURL.platformPathToURL(NdbProcessInfo.cwd)
-    });
-    this._manager.addEventListener(
-        SDK.SourceMapManager.Events.SourceMapAttached, this._sourceMapAttached, this);
-    Workspace.workspace.addEventListener(Workspace.Workspace.Events.UISourceCodeAdded, this._uiSourceCodeAdded, this);
-
-    this._bindings = new Map();
-    this._fileUrlToSourceMap = new Map();
-  }
-
-  _sourceMapDetected(fsPath, fileName, sourceMappingUrl) {
-    const fsPathUrl = Common.ParsedURL.platformPathToURL(fsPath);
-    const fileUrl = Common.ParsedURL.platformPathToURL(fileName);
-    this._manager.attachSourceMap({fsPathUrl, fileUrl}, fileUrl, sourceMappingUrl);
-  }
-
-  /**
-   * @param {!Common.Event} event
-   */
-  _sourceMapAttached(event) {
-    const {fsPathUrl, fileUrl} = event.data.client;
-    const sourceMap = /** @type {!SDK.SourceMap} */ (event.data.sourceMap);
-    for (const sourceUrl of sourceMap.sourceURLs()) {
-      this._bindings.set(`${fsPathUrl}|${sourceUrl}`, sourceMap);
-      this._fileUrlToSourceMap.set(sourceUrl, sourceMap);
-    }
-    const fileSystemProjects = Workspace.workspace.projectsForType('filesystem');
-    for (const fileSystemProject of fileSystemProjects) {
-      if (fileSystemProject.fileSystemPath() === fsPathUrl) {
-        const uiSourceCode = fileSystemProject.uiSourceCodeForURL(fileUrl);
-        if (uiSourceCode) {
-          uiSourceCode[Bindings.CompilerScriptMapping._sourceMapSymbol] = sourceMap;
-          break;
-        }
-      }
-    }
-  }
-
-  sourceMap(fileUrl) {
-    return this._fileUrlToSourceMap.get(fileUrl) || null;
-  }
-
-  /**
-   * @param {!Common.Event} event
-   */
-  _uiSourceCodeAdded(event) {
-    const uiSourceCode = /** @type {!Workspace.UISourceCode} */ (event.data);
-    const project = uiSourceCode.project();
-    if (project.type() !== 'filesystem')
-      return;
-    const key = `${project.fileSystemPath()}|${uiSourceCode.url()}`;
-    const sourceMap = this._bindings.get(key);
-    if (sourceMap)
-      uiSourceCode[Bindings.CompilerScriptMapping._sourceMapSymbol] = sourceMap;
-  }
-};
-
 /**
  * @implements {UI.ContextMenu.Provider}
  * @unrestricted
@@ -262,12 +188,13 @@ Ndb.ServiceManager = class {
     return service;
   }
 
-  notify(serviceId, notification) {
-    const service = this._runningServices.get(serviceId);
-    if (service) {
-      if (notification.method === 'disposed')
+  notify(notifications) {
+    for (const {serviceId, callId, payload} of notifications) {
+      const service = this._runningServices.get(serviceId);
+      if (service)
+        service._notify(callId, payload);
+      if (!callId && payload.method === 'disposed')
         this._runningServices.delete(serviceId);
-      service.dispatchEventToListeners(Ndb.Service.Events.Notification, notification);
     }
   }
 };
@@ -277,11 +204,33 @@ Ndb.Service = class extends Common.Object {
   constructor(serviceId) {
     super();
     this._serviceId = serviceId;
+    this._lastCallId = 0;
+    this._callbacks = new Map();
   }
 
-  async call(method, options) {
-    const {result, error} = await callNdbService(this._serviceId, method, options);
-    return error || !result ? {error} : result;
+  call(method, options) {
+    const callId = ++this._lastCallId;
+    const promise = new Promise(resolve => this._callbacks.set(callId, resolve));
+    callNdbService(JSON.stringify({
+      serviceId: this._serviceId,
+      callId,
+      method,
+      options
+    }));
+    return promise;
+  }
+
+  _notify(callId, payload) {
+    if (callId) {
+      const callback = this._callbacks.get(callId);
+      this._callbacks.delete(callId);
+      if (callback) {
+        const {result, error} = payload || {};
+        callback(error || !result ? {error} : result);
+      }
+    } else {
+      this.dispatchEventToListeners(Ndb.Service.Events.Notification, payload);
+    }
   }
 };
 
@@ -338,20 +287,14 @@ Ndb.NodeProcessManager = class extends Common.Object {
   }
 
   async _onProcessAdded(payload) {
-    let targetInfo;
-    try {
-      ([targetInfo] = await (await fetch(payload.targetListUrl)).json());
-    } catch (e) {
-      return;
-    }
     const pid = payload.id;
     const processInfo = new Ndb.ProcessInfo(payload);
     this._processes.set(pid, processInfo);
 
-    const parentTarget = payload.ppid ? this._targetManager.targetById(payload.ppid) : null;
+    const parentTarget = payload.ppid ? this._targetManager.targetById(payload.ppid) : this._targetManager.mainTarget();
     const target = this._targetManager.createTarget(
         pid, processInfo.userFriendlyName(), SDK.Target.Capability.JS,
-        this._createConnection.bind(this, pid, targetInfo.webSocketDebuggerUrl),
+        this._createConnection.bind(this, pid),
         parentTarget, true);
     if (this._shouldPauseAtStart(payload.argv)) {
       target.runtimeAgent().invoke_evaluate({
@@ -362,15 +305,15 @@ Ndb.NodeProcessManager = class extends Common.Object {
     return target.runtimeAgent().runIfWaitingForDebugger();
   }
 
-  _createConnection(id, webSocketDebuggerUrl, params) {
-    const connection = new SDK.WebSocketConnection(webSocketDebuggerUrl,
-        _ => {
-          this._connections.delete(id);
-          this._processes.delete(id);
-        },
-        params);
+  _createConnection(id, params) {
+    const connection = new Ndb.Connection(id, this._nddService, this._onWebSocketDisconnected.bind(this, id), params);
     this._connections.set(id, connection);
     return connection;
+  }
+
+  _onWebSocketDisconnected(id) {
+    this._connections.delete(id);
+    this._processes.delete(id);
   }
 
   _shouldPauseAtStart(argv) {
@@ -436,6 +379,48 @@ Ndb.NodeProcessManager = class extends Common.Object {
   }
 };
 
+/**
+ * @implements {Protocol.InspectorBackend.Connection}
+ */
+Ndb.Connection = class {
+  constructor(pid, nddService, onWebSocketDisconnect, params) {
+    this._pid = pid;
+    this._nddService = nddService;
+    this._onDisconnect = params.onDisconnect;
+    this._onMessage = params.onMessage;
+    this._onWebSocketDisconnect = onWebSocketDisconnect;
+    this._nddService.addEventListener(Ndb.Service.Events.Notification, this._onServiceNotification.bind(this));
+  }
+
+  _onServiceNotification({data: {name, params}}) {
+    if (name === 'message' && params.id === this._pid)
+      this._onMessage.call(null, params.message);
+    if (name === 'disconnected' && params.id === this._pid) {
+      this._onWebSocketDisconnect.call(null);
+      this._onDisconnect.call(null, 'websocket closed');
+    }
+  }
+
+  /**
+   * @param {string} domain
+   * @param {!Protocol.InspectorBackend.Connection.MessageObject} messageObject
+   */
+  sendMessage(domain, messageObject) {
+    return this._nddService.call('send', {
+      id: this._pid,
+      message: JSON.stringify(messageObject)
+    });
+  }
+
+  /**
+   * @return {!Promise}
+   */
+  disconnect() {
+    return this._nddService.call('disconnect', {id: this._pid})
+        .then(_ => this._onDisconnect.call(null, 'force disconnect'));
+  }
+};
+
 Ndb.ProcessInfo = class {
   constructor(payload) {
     this._argv = payload.argv;
@@ -486,8 +471,6 @@ Ndb.RestartActionDelegate = class {
     return false;
   }
 };
-
-SDK.targetManager.mainTarget = () => null;
 
 SDK.DebuggerModel.prototype.scheduleStepIntoAsync = function() {
   this._agent.scheduleStepIntoAsync();
