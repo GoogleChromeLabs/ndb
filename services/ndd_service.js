@@ -11,6 +11,7 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 const util = require('util');
+const url = require('url');
 const WebSocket = require('ws');
 
 const {ServiceBase} = require('./service_base.js');
@@ -24,32 +25,44 @@ const removeFolder = util.promisify(require('rimraf'));
 class NddService extends ServiceBase {
   constructor() {
     super();
-    this._nddStore = '';
-    this._nddStoreWatcher = null;
+    this._nddStores = [];
+    this._nddStoreWatchers = [];
     this._running = new Set();
     this._sockets = new Map();
   }
 
-  async init() {
-    this._nddStore = await fsMkdtemp(path.join(os.tmpdir(), 'ndb-'));
-    this._nddStoreWatcher = chokidar.watch(this._nddStore, {
-      awaitWriteFinish: {
-        stabilityThreshold: 500,
-        pollInterval: 100
-      },
-      cwd: this._nddStore,
-      depth: 0
-    });
-    this._nddStoreWatcher.on('add', this._onAdded.bind(this));
-    this._nddStoreWatcher.on('unlink', id => this._running.delete(id));
-    return this._nddStore;
+  async init({nddSharedStore}) {
+    this._nddStores = [await fsMkdtemp(path.join(os.tmpdir(), 'ndb-'))];
+    if (nddSharedStore)
+      this._nddStores.push(nddSharedStore);
+    this._nddStoreWatchers = [];
+    for (const nddStore of this._nddStores) {
+      const watcher = chokidar.watch(nddStore, {
+        awaitWriteFinish: {
+          stabilityThreshold: 500,
+          pollInterval: 100
+        },
+        cwd: nddStore,
+        depth: 0
+      });
+      this._nddStoreWatchers.push(watcher);
+      watcher.on('add', this._onAdded.bind(this, nddStore));
+      watcher.on('unlink', id => this._running.delete(id));
+    }
+    return this._nddStores[0];
   }
 
-  async _onAdded(id) {
+  async _onAdded(nddStore, id) {
     this._running.add(id);
     try {
-      const info = JSON.parse(await fsReadFile(path.join(this._nddStore, id), 'utf8'));
-      const {webSocketDebuggerUrl} = (await this._fetch(info.targetListUrl))[0];
+      const info = JSON.parse(await fsReadFile(path.join(nddStore, id), 'utf8'));
+      const targetInfo = (await this._fetch(info.targetListUrl))[0];
+      let webSocketDebuggerUrl = targetInfo.webSocketDebuggerUrl;
+      if (!webSocketDebuggerUrl) {
+        const wsUrl = url.parse(info.wsUrl);
+        wsUrl.pathname = '/' + targetInfo.id;
+        webSocketDebuggerUrl = url.format(wsUrl);
+      }
       const ws = new WebSocket(webSocketDebuggerUrl);
       ws.on('error', _ => 0);
       ws.once('open', _ => {
@@ -104,12 +117,11 @@ class NddService extends ServiceBase {
       for (const id of this._running)
         process.kill(id, 'SIGKILL');
       this._running.clear();
-      if (this._nddStoreWatcher) {
-        this._nddStoreWatcher.close();
-        this._nddStoreWatcher = null;
-        await removeFolder(this._nddStore);
-        this._nddStore = '';
-      }
+      for (const watcher of this._nddStoreWatchers)
+        watcher.close();
+      await removeFolder(this._nddStores[0]);
+      this._nddStores = [];
+      this._nddStoreWatchers = [];
     } catch (e) {
     } finally {
       process.exit(0);
@@ -119,7 +131,8 @@ class NddService extends ServiceBase {
   async debug({execPath, args, options}) {
     const env = {
       NODE_OPTIONS: `--require ${options.preload}`,
-      NDD_STORE: this._nddStore,
+      NDD_STORE: this._nddStores[0],
+      NDD_WAIT_FOR_CONNECTION: 1,
       NDB_VERSION
     };
     if (options && options.data)
@@ -144,14 +157,15 @@ class NddService extends ServiceBase {
     return new Promise((resolve, reject) => {
       p.on('exit', code => resolve(code));
       p.on('error', error => reject(error));
-    }).then(_ => fs.unlink(path.join(this._nddStore, String(p.pid)), err => 0));
+    }).then(_ => fs.unlink(path.join(this._nddStores[0], String(p.pid)), err => 0));
   }
 
   async kill({id}) {
     if (!this._running.has(id))
       return;
     process.kill(id, 'SIGKILL');
-    fs.unlink(path.join(this._nddStore, id), _ => 0);
+    for (const nddStore of this._nddStores)
+      fs.unlink(path.join(nddStore, id), _ => 0);
   }
 }
 

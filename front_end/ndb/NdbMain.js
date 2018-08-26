@@ -255,7 +255,9 @@ Ndb.NodeProcessManager = class extends Common.Object {
   static async _create() {
     const service = await Ndb.serviceManager.create('ndd_service');
     const instance = new Ndb.NodeProcessManager(SDK.targetManager, service);
-    instance._nddStore = await service.call('init');
+    instance._nddStore = await service.call('init', {
+      nddSharedStore: NdbProcessInfo.nddSharedStore
+    });
     Ndb.NodeProcessManager._instanceReady(instance);
     delete Ndb.NodeProcessManager._instanceReady;
   }
