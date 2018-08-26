@@ -84,13 +84,22 @@ class Services {
     });
   }
 
+  _disposeService(serviceId) {
+    const {service, callbacks, disposeCallbacks} = this._serviceIdToService.get(serviceId) || {};
+    if (!service)
+      return;
+    const callbackId = ++this._lastCallbackId;
+    disposeCallbacks.add(callbackId);
+    service.send({method: 'dispose', options: {}, callbackId});
+    return new Promise(resolve => callbacks.set(callbackId, resolve));
+  }
+
   dispose() {
     if (this._isDisposed)
       return;
     this._isDisposed = true;
-    return Promise.all(Array.from(this._serviceIdToService.keys()).map(serviceId => {
-      this.callNdbService(serviceId, 'dispose', {});
-    }));
+    const serviceIds = Array.from(this._serviceIdToService.keys());
+    return Promise.all(serviceIds.map(serviceId => this._disposeService(serviceId)));
   }
 
   _onServiceMessage(serviceId, {message, callbackId}) {
