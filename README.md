@@ -25,7 +25,7 @@ yarn global add ndb
 
 Global installation may fail with different permission errors, you can find help in this [thread](https://github.com/GoogleChromeLabs/ndb/issues/20).
 
-Windows users: Installation may fail on Windows during compilation the native dependencies. The following command may help: `npm install -g --production windows-build-tools`
+Windows users: Installation may fail on Windows during compilation the native dependencies. The following command may help: `npm install -g windows-build-tools`
 
 ### Local install
 
