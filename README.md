@@ -29,7 +29,7 @@ Windows users: Installation may fail on Windows during compilation the native de
 
 ### Local install
 
-If you want ndb available from an npm script (eg. `npm run debug` runs `ndb index.js`), you can install as a development dependency:
+If you want ndb available from an npm script (eg. `npm run debug` runs `ndb index.js`), you can install it as a development dependency:
 
 ```bash
 # local install with npm:
