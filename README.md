@@ -25,14 +25,19 @@ yarn global add ndb
 
 Global installation may fail with different permission errors, you can find help in this [thread](https://github.com/GoogleChromeLabs/ndb/issues/20).
 
-Windows users: Installation may fail on Windows during compilation the native dependencies. The following command may help: `npm install --g --production windows-build-tools`
+Windows users: Installation may fail on Windows during compilation the native dependencies. The following command may help: `npm install -g windows-build-tools`
 
 ### Local install
 
-If you want ndb available from an npm script (eg. `npm run debug` runs `ndb index.js`), you can install as a development dependency:
+If you want ndb available from an npm script (eg. `npm run debug` runs `ndb index.js`), you can install it as a development dependency:
 
 ```bash
+# local install with npm:
 npm install --save-dev ndb
+
+
+# alternatively, with yarn:
+yarn add ndb --dev
 ```
 
 You can then [set up an npm script](https://docs.npmjs.com/misc/scripts#examples). In this case, ndb will not be available in your system path.
