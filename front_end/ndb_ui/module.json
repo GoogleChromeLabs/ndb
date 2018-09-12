@@ -34,7 +34,7 @@
           "className": "Ndb.NodeModulesBlackboxing"
       }
   ],
-  "dependencies": ["ui", "sources"],
+  "dependencies": ["ui", "sources", "timeline"],
   "scripts": [
       "RunConfiguration.js",
       "NodeProcesses.js",

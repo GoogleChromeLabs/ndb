@@ -20,8 +20,7 @@ Ndb.NdbMain = class extends Common.Object {
 
     // Create root Main target.
     const stubConnection = new SDK.StubConnection({onMessage: _ => 0, onDisconnect: _ => 0});
-    SDK.targetManager.createTarget('<root>', '', 0, _ => stubConnection, null, false);
-
+    SDK.targetManager.createTarget('<root>', '', 0, _ => stubConnection, null, true);
     this._startRepl();
 
     registerFileSystem('cwd', NdbProcessInfo.cwd).then(_ => {
@@ -32,6 +31,7 @@ Ndb.NdbMain = class extends Common.Object {
         type: ''
       });
     });
+    Runtime.experiments.setEnabled('timelineTracingJSProfile', false);
   }
 
   async _startRepl() {
@@ -332,11 +332,16 @@ Ndb.NodeProcessManager = class extends Common.Object {
     return true;
   }
 
-  _onExecutionContextDestroyed({data: executionContext}) {
-    if (Common.moduleSetting('waitAtEnd').get() || executionContext.id !== 1)
+  async _onExecutionContextDestroyed({data: executionContext}) {
+    const mainContextId = 1;
+    if (executionContext.id !== mainContextId)
       return;
-    if (executionContext.target().suspended())
-      return;
+    const target = executionContext.target();
+    if (target.suspended()) {
+      const debuggerModel = target.model(SDK.DebuggerModel);
+      await new Promise(resolve => debuggerModel.addEventListener(
+          SDK.DebuggerModel.Events.DebuggerWasEnabled, resolve));
+    }
     const connection = this._connections.get(executionContext.target().id());
     if (connection)
       connection.disconnect();
