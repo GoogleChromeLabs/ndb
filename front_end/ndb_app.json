@@ -1,7 +1,11 @@
 {
   "modules" : [
      { "name": "ndb", "type": "autostart" },
-     { "name": "js_profiler" },
+     { "name": "layer_viewer" },
+     { "name": "timeline_model" },
+     { "name": "timeline" },
+     { "name": "product_registry" },
+     { "name": "mobile_throttling" },
      { "name": "ndb_ui" }
  ],
   "extends": "shell",

@@ -21,14 +21,6 @@
         {
             "type": "setting",
             "category": "Debugger",
-            "title": "Wait at end",
-            "settingName": "waitAtEnd",
-            "settingType": "boolean",
-            "defaultValue": false
-        },
-        {
-            "type": "setting",
-            "category": "Debugger",
             "title": "Autostart main",
             "settingName": "autoStartMain",
             "settingType": "boolean",
