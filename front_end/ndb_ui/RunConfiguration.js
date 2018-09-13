@@ -52,12 +52,23 @@ Ndb.RunConfiguration = class extends UI.VBox {
     const runButton = new UI.ToolbarButton(Common.UIString('Run'), 'largeicon-play');
     runButton.addEventListener(UI.ToolbarButton.Events.Click, this._runConfig.bind(this, item.execPath, item.args));
     toolbar.appendToolbarItem(runButton);
+    const profileButton = new UI.ToolbarButton(Common.UIString('Start recording..'), 'largeicon-start-recording');
+    profileButton.addEventListener(UI.ToolbarButton.Events.Click, this._profileConfig.bind(this, item.execPath, item.args));
+    toolbar.appendToolbarItem(profileButton);
     return f.element();
   }
 
   async _runConfig(execPath, args) {
     const manager = await Ndb.NodeProcessManager.instance();
     await manager.debug(execPath, args);
+  }
+
+  async _profileConfig(execPath, args) {
+    await UI.viewManager.showView('timeline');
+    await Common.console.showPromise();
+    const action = UI.actionRegistry.action('timeline.toggle-recording');
+    await action.execute();
+    await this._runConfig(execPath, args);
   }
 
   /**
