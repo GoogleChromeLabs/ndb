@@ -21,6 +21,7 @@
   InspectorFrontendHost.setPreference = setPreference;
   InspectorFrontendHost.removePreference = removePreference;
   InspectorFrontendHost.clearPreferences = clearPreferences;
+  InspectorFrontendHost.bringToFront = bringToFront;
 
   Common.Settings.prototype._storageFromType = function(storageType) {
     switch (storageType) {
