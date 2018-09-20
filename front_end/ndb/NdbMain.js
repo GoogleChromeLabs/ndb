@@ -484,43 +484,6 @@ SDK.DebuggerModel.prototype.scheduleStepIntoAsync = function() {
   this._agent.invoke_stepInto({breakOnAsyncCall: true});
 };
 
-/**
- * @param {string} url
- * @param {number} lineNumber
- * @param {number=} columnNumber
- * @param {string=} condition
- * @return {!Promise<!SDK.DebuggerModel.SetBreakpointResult>}
- */
-SDK.DebuggerModel.prototype.setBreakpointByURL = async function(url, lineNumber, columnNumber, condition) {
-  // Convert file url to node-js path.
-  let urlRegex;
-  if (this.target().isNodeJS()) {
-    const platformPath = Common.ParsedURL.urlToPlatformPath(url, Host.isWin());
-    if (url.endsWith('.mjs'))
-      urlRegex = `${platformPath.escapeForRegExp()}|${url.escapeForRegExp()}`;
-    else
-      url = platformPath;
-  } else {
-    // Adjust column if needed.
-    let minColumnNumber = 0;
-    const scripts = this._scriptsBySourceURL.get(url) || [];
-    for (let i = 0, l = scripts.length; i < l; ++i) {
-      const script = scripts[i];
-      if (lineNumber === script.lineOffset)
-        minColumnNumber = minColumnNumber ? Math.min(minColumnNumber, script.columnOffset) : script.columnOffset;
-    }
-    columnNumber = Math.max(columnNumber, minColumnNumber);
-  }
-  const response = await this._agent.invoke_setBreakpointByUrl(
-      {lineNumber: lineNumber, url: urlRegex ? undefined : url, urlRegex: urlRegex, columnNumber: columnNumber, condition: condition});
-  if (response[Protocol.Error])
-    return {locations: [], breakpointId: null};
-  let locations;
-  if (response.locations)
-    locations = response.locations.map(payload => SDK.DebuggerModel.Location.fromPayload(this, payload));
-  return {locations: locations, breakpointId: response.breakpointId};
-};
-
 // Temporary hack until frontend with fix is rolled.
 // fix: TBA.
 SDK.Target.prototype.decorateLabel = function(label) {
