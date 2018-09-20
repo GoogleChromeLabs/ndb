@@ -27,7 +27,7 @@
     "isbinaryfile": "^3.0.3",
     "mime": "^2.3.1",
     "opn": "^5.3.0",
-    "puppeteer": "1.8.0",
+    "puppeteer": "1.7.0",
     "rimraf": "^2.6.2",
     "update-notifier": "^2.5.0",
     "ws": "^6.0.0",
