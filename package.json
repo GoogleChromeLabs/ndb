@@ -15,7 +15,7 @@
     "lint": "./node_modules/.bin/eslint .",
     "prepare": "node build.js",
     "dummyScriptForTest": "node -e 'console.log(239)'",
-    "unit": "./node_modules/mocha/bin/mocha test/test.js",
+    "unit": "node test/unit.js",
     "integration": "node test/integration.js"
   },
   "author": "The Chromium Authors",
