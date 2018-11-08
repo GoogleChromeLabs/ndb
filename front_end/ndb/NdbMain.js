@@ -20,7 +20,8 @@ Ndb.NdbMain = class extends Common.Object {
 
     // Create root Main target.
     const stubConnection = new SDK.StubConnection({onMessage: _ => 0, onDisconnect: _ => 0});
-    SDK.targetManager.createTarget('<root>', '', 0, _ => stubConnection, null, true);
+    SDK.targetManager.createTarget('<root>', SDK.Target.Type.Browser, 0, _ => stubConnection, null, true);
+
     this._startRepl();
 
     registerFileSystem('cwd', NdbProcessInfo.cwd).then(_ => {
@@ -295,7 +296,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
 
     const parentTarget = payload.ppid ? this._targetManager.targetById(payload.ppid) : this._targetManager.mainTarget();
     const target = this._targetManager.createTarget(
-        pid, processInfo.userFriendlyName(), SDK.Target.Capability.JS,
+        pid, processInfo.userFriendlyName(), SDK.Target.Type.Node,
         this._createConnection.bind(this, pid),
         parentTarget, true);
     if (this._shouldPauseAtStart(payload.argv)) {
