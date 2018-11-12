@@ -18,8 +18,6 @@ class Services {
   }
 
   static async create(frontend) {
-    const cdpSession = await frontend.target().createCDPSession();
-    cdpSession.send('Runtime.enable', {});
     let buffer = [];
     let timer = 0;
     const services = new Services((serviceId, callId, payload) => {
@@ -28,19 +26,16 @@ class Services {
           timer = 0;
           const expression = `Ndb.serviceManager.notify(${JSON.stringify(buffer)})`;
           buffer = [];
-          cdpSession.send('Runtime.evaluate', {
-            expression: process.env.NDB_DEBUG_FRONTEND ? `callFrontend(_ => ${expression}),null` : `${expression},null`
-          });
+          frontend.evaluate(process.env.NDB_DEBUG_FRONTEND ? `callFrontend(_ => ${expression}),null` : `${expression},null`);
         }, 50);
       }
       buffer.push({serviceId, callId, payload});
     });
     await Promise.all([
       frontend.exposeFunction('createNdbService', services.createNdbService.bind(services)),
-      cdpSession.send('Runtime.addBinding', {name: 'callNdbService'})
+      frontend.exposeFunction('callNdbService', services.callNdbService.bind(services))
     ]);
-    cdpSession.on('Runtime.bindingCalled', event => services._onBindingCalled(event));
-    frontend.on('close', services.dispose.bind(services));
+    frontend.on('exit', services.dispose.bind(services));
     return services;
   }
 
@@ -67,7 +62,8 @@ class Services {
     })).then(_ => ({serviceId}));
   }
 
-  callNdbService(serviceId, callId, method, options) {
+  callNdbService(args) {
+    const {serviceId, callId, method, options} = args;
     const {service, callbacks, disposeCallbacks} = this._serviceIdToService.get(serviceId) || {};
     if (!service) {
       this._notify(serviceId, callId, {error: `Service with id=${serviceId} not found`});

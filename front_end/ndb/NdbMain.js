@@ -4,6 +4,13 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
+function callFrontend(f) {
+  if (Runtime.queryParam('debugFrontend'))
+    setTimeout(f, 0);
+  else
+    f();
+}
+
 /**
  * @implements {Common.Runnable}
  */
@@ -11,9 +18,10 @@ Ndb.NdbMain = class extends Common.Object {
   /**
    * @override
    */
-  run() {
+  async run() {
     InspectorFrontendAPI.setUseSoftMenu(true);
     document.title = 'ndb';
+    self.NdbProcessInfo = await getProcessInfo();
     Common.moduleSetting('blackboxAnythingOutsideCwd').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
     Common.moduleSetting('whitelistedModules').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
     Ndb.NdbMain._calculateBlackboxState();
@@ -211,12 +219,12 @@ Ndb.Service = class extends Common.Object {
   call(method, options) {
     const callId = ++this._lastCallId;
     const promise = new Promise(resolve => this._callbacks.set(callId, resolve));
-    callNdbService(JSON.stringify({
+    callNdbService({
       serviceId: this._serviceId,
       callId,
       method,
       options
-    }));
+    });
     return promise;
   }
 
