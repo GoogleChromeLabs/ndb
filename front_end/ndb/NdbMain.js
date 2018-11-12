@@ -31,15 +31,10 @@ Ndb.NdbMain = class extends Common.Object {
     SDK.targetManager.createTarget('<root>', '', 0, _ => stubConnection, null, true);
     this._startRepl();
 
-    registerFileSystem('cwd', NdbProcessInfo.cwd).then(_ => {
-      InspectorFrontendAPI.fileSystemAdded(undefined, {
-        fileSystemName: 'cwd',
-        fileSystemPath: NdbProcessInfo.cwd,
-        rootURL: '',
-        type: ''
-      });
-    });
     Runtime.experiments.setEnabled('timelineTracingJSProfile', false);
+    const cwdUrl = Common.ParsedURL.platformPathToURL(NdbProcessInfo.cwd);
+    const fileSystemManager = Persistence.isolatedFileSystemManager;
+    fileSystemManager.addPlatformFileSystem(cwdUrl, await Ndb.FileSystem.create(fileSystemManager, NdbProcessInfo.cwd, cwdUrl));
   }
 
   async _startRepl() {
