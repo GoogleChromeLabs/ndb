@@ -34,7 +34,7 @@ Ndb.Terminal = class extends UI.VBox {
     if (this._backend)
       this._backend.dispose();
     const nddStore = await (await Ndb.NodeProcessManager.instance()).nddStore();
-    this._backend = await backend.createService(
+    this._backend = await (await Runtime.backendPromise).createService(
         NdbProcessInfo.serviceDir + '/terminal.js',
         rpc.handle(this),
         nddStore,

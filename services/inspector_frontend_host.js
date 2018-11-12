@@ -4,35 +4,29 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-const fs = require('fs');
-const path = require('path');
-const util = require('util');
+const { rpc, rpc_process } = require('carlo/rpc');
 
+const fs = require('fs');
+const util = require('util');
+const path = require('path');
 const fsReadFile = util.promisify(fs.readFile);
 const fsWriteFile = util.promisify(fs.writeFile);
 
-class NdbPreferences {
-  static async create(frontend, configDir) {
-    const preferencesFile = path.join(configDir, 'Preferences');
-    const current = await NdbPreferences._read(preferencesFile);
-    const preferences = new NdbPreferences(preferencesFile, current);
-    await Promise.all([
-      preferences._sync(),
-      frontend.exposeFunction('getPreferences', _ => NdbPreferences._read(preferencesFile)),
-      frontend.exposeFunction('setPreference', preferences._setPreference.bind(preferences)),
-      frontend.exposeFunction('removePreference', preferences._removePreference.bind(preferences)),
-      frontend.exposeFunction('clearPreferences', preferences._clearPreferences.bind(preferences))
-    ]);
+const clipboardy = require('clipboardy');
+const opn = require('opn');
+
+class Preferences {
+  /**
+   * @param {string} configDir
+   */
+  constructor(configDir) {
+    this._file = path.join(configDir, 'Preferences');
+    this._current = {};
   }
 
-  /**
-   * @param {string} preferencesFile
-   * @param {!Object} current
-   * @return {!Promise}
-   */
-  constructor(preferencesFile, current) {
-    this._file = preferencesFile;
-    this._current = current;
+  async getPreferences() {
+    this._current = await Preferences._read(this._file, /* forceDefault */ false);
+    return this._current;
   }
 
   /**
@@ -40,7 +34,7 @@ class NdbPreferences {
    * @param {string} value
    * @return {!Promise}
    */
-  _setPreference(name, value) {
+  setPreference(name, value) {
     this._current[name] = value;
     return this._sync();
   }
@@ -49,7 +43,7 @@ class NdbPreferences {
    * @param {string} name
    * @return {!Promise}
    */
-  _removePreference(name) {
+  removePreference(name) {
     delete this._current[name];
     return this._sync();
   }
@@ -57,8 +51,8 @@ class NdbPreferences {
   /**
    * @return {!Promise}
    */
-  async _clearPreferences() {
-    this._current = await NdbPreferences._read(undefined, true);
+  async clearPreferences() {
+    this._current = await Preferences._read(this._file, /* forceDefault */ true);
     return this._sync();
   }
 
@@ -85,4 +79,39 @@ class NdbPreferences {
   }
 }
 
-module.exports = { NdbPreferences };
+class InspectorFrontendHost {
+  constructor(configDir) {
+    this._preferences = new Preferences(configDir);
+  }
+
+  /**
+   * @param {string} text
+   */
+  copyText(text) {
+    clipboardy.write(text);
+  }
+  /**
+   * @param {text} url
+   */
+  openInNewTab(url) {
+    opn.openInNewTab(url);
+  }
+
+  getPreferences() {
+    return this._preferences.getPreferences();
+  }
+
+  setPreference(name, value) {
+    return this._preferences.setPreference(name, value);
+  }
+
+  removePreference(name) {
+    return this._preferences.removePreference(name);
+  }
+
+  clearPreferences() {
+    return this._preferences.clearPreferences();
+  }
+}
+
+rpc_process.init(args => rpc.handle(new InspectorFrontendHost(args.args[0])));
