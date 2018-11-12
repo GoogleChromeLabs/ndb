@@ -4,11 +4,14 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
+const { rpc, rpc_process } = require('carlo/rpc');
 const fs = require('fs');
 const path = require('path');
 
 const isbinaryfile = require('isbinaryfile');
-// TODO: migrate to service.
+
+// TODO(ak239): track changed files.
+
 class SearchBackend {
   constructor(frontend) {
     this._frontend = frontend;
@@ -21,17 +24,6 @@ class SearchBackend {
     this._fileNameToIndex = new Map();
 
     this._excludeRegex = null;
-  }
-
-  static async create(frontend) {
-    const backend = new SearchBackend(frontend);
-    await Promise.all([
-      frontend.exposeFunction('setExcludedPattern', backend.setExcludedPattern.bind(backend)),
-      frontend.exposeFunction('indexPath', backend.indexPath.bind(backend)),
-      frontend.exposeFunction('stopIndexing', backend.stopIndexing.bind(backend)),
-      frontend.exposeFunction('searchInPath', backend.searchInPath.bind(backend))
-    ]);
-    return backend;
   }
 
   setExcludedPattern(pattern) {
@@ -88,15 +80,15 @@ class SearchBackend {
       else if (!await new Promise(resolve => isbinaryfile(file, (err, isBinary) => resolve(err || isBinary))))
         textFiles.push(file);
     }
-    this.indexingTotalWorkCalculated(requestId, fileSystemPath, textFiles.length);
+    this._frontend.indexingTotalWorkCalculated(requestId, fileSystemPath, textFiles.length);
     for (const fileName of textFiles) {
       if (!this._activeIndexing.has(requestId))
         return;
       await this._indexFile(fileName, index);
-      this.indexingWorked(requestId, fileSystemPath, 1);
+      this._frontend.indexingWorked(requestId, fileSystemPath, 1);
     }
     this._index.set(fileSystemPath, index);
-    this.indexingDone(requestId, fileSystemPath);
+    this._frontend.indexingDone(requestId, fileSystemPath);
     this._activeIndexing.delete(requestId);
   }
 
@@ -150,7 +142,7 @@ class SearchBackend {
    */
   async _indexChangedFiles(requestId, fileSystemPath) {
     if (!this._filesQueue.size) {
-      this.indexingDone(requestId);
+      this._frontend.indexingDone(requestId);
       return;
     }
     this._activeIndexing.add(requestId);
@@ -166,7 +158,7 @@ class SearchBackend {
         textFiles.push(file);
     }
 
-    this.indexingTotalWorkCalculated(requestId, textFiles.length);
+    this._frontend.indexingTotalWorkCalculated(requestId, textFiles.length);
     const index = this._index.get(fileSystemPath);
     while (textFiles.length) {
       if (!this._activeIndexing.has(requestId)) {
@@ -176,10 +168,10 @@ class SearchBackend {
       }
       const fileName = textFiles.shift();
       await this._indexFile(fileName, index);
-      this.indexingWorked(requestId, 1);
+      this._frontend.indexingWorked(requestId, 1);
     }
     this._activeIndexing.delete(requestId);
-    this.indexingDone(requestId);
+    this._frontend.indexingDone(requestId);
   }
 
   /**
@@ -215,58 +207,8 @@ class SearchBackend {
       result = Array.from(resultSet);
     }
     result = result.map(index => this._indexToFileName.get(index));
-    this.searchCompleted(requestId, fileSystemPath, result);
-  }
-
-  /**
-   * @param {number} requestId
-   * @param {string} fileSystemPath
-   * @param {number} totalWork
-   */
-  indexingTotalWorkCalculated(requestId, fileSystemPath, totalWork) {
-    this._frontend.safeEvaluate((requestId, fileSystemPath, totalWork) => {
-      callFrontend(_ => InspectorFrontendAPI.indexingTotalWorkCalculated(requestId, fileSystemPath, totalWork));
-    }, requestId, fileSystemPath, totalWork);
-  }
-
-  /**
-   * @param {number} requestId
-   * @param {string} fileSystemPath
-   * @param {number} worked
-   */
-  indexingWorked(requestId, fileSystemPath, worked) {
-    this._frontend.safeEvaluate((requestId, fileSystemPath, worked) => {
-      callFrontend(_ => InspectorFrontendAPI.indexingWorked(requestId, fileSystemPath, worked));
-    }, requestId, fileSystemPath, worked);
-  }
-
-  /**
-   * @param {number} requestId
-   * @param {string} fileSystemPath
-   */
-  indexingDone(requestId, fileSystemPath) {
-    this._frontend.safeEvaluate((requestId, fileSystemPath) => {
-      callFrontend(_ => InspectorFrontendAPI.indexingDone(requestId, fileSystemPath));
-    }, requestId, fileSystemPath);
-  }
-
-  /**
-   * @param {number} requestId
-   * @param {string} fileSystemPath
-   * @param {!Array.<string>} files
-   */
-  searchCompleted(requestId, fileSystemPath, files) {
-    this._frontend.safeEvaluate((requestId, fileSystemPath, files) => {
-      callFrontend(_ => InspectorFrontendAPI.searchCompleted(requestId, fileSystemPath, files));
-    }, requestId, fileSystemPath, files);
-  }
-
-  /**
-   * @param {string} fileName
-   */
-  addFile(fileName) {
-    this._filesQueue.add(fileName);
+    this._frontend.searchCompleted(requestId, fileSystemPath, result);
   }
 }
 
-module.exports = {SearchBackend};
+rpc_process.init(args => rpc.handle(new SearchBackend(args.args[0])));
