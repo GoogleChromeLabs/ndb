@@ -4,93 +4,91 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
+Terminal.applyAddon(fit);
+
 Ndb.Terminal = class extends UI.VBox {
   constructor() {
     super(true);
     this.registerRequiredCSS('node_modules/xterm/dist/xterm.css');
-    Terminal.applyAddon(fit);
-    this._term = null;
-    this._service = null;
-
-    this._buffer = '';
-    this._ready = false;
-
-    this._terminalShownCallback = null;
-    this._terminalPromise = new Promise(resolve => this._terminalShownCallback = resolve);
-    this._init();
   }
 
-  async _init() {
-    this._service = await Ndb.serviceManager.create('terminal');
-    await this._terminalPromise;
-    this._terminal.on('resize', size => this._service.call('resize', {cols: size.cols, rows: size.rows}));
-    this._terminal.on('data', data => {
-      if (this._ready)
-        this._service.call('write', {data: data});
-      else
-        this._buffer += data;
-    });
-    this._service.addEventListener(Ndb.Service.Events.Notification, this._onNotification.bind(this));
-    this._initService();
-  }
-
-  _onNotification({data: {name, params}}) {
-    if (name === 'data')
-      this._terminal.write(params.data);
-    if (name === 'close')
-      this._initService();
-  }
-
-  async _initService() {
-    this._ready = false;
-    const nddStore = await (await Ndb.NodeProcessManager.instance()).nddStore();
-    const {error} = await this._service.call('init', {
-      cols: this._terminal.cols,
-      rows: this._terminal.rows,
-      nddStore: nddStore,
-      preload: NdbProcessInfo.preload
-    });
-    this._ready = true;
-    if (this._buffer.length) {
-      this._service.call('write', {data: this._buffer});
-      this._buffer = '';
+  static _createTerminal() {
+    const terminal = new Terminal();
+    let fontFamily;
+    let fontSize = 11;
+    if (Host.isMac()) {
+      fontFamily = 'Menlo, monospace';
+    } else if (Host.isWin()) {
+      fontFamily = 'Consolas, Lucida Console, Courier New, monospace';
+      fontSize = 12;
+    } else {
+      fontFamily = 'dejavu sans mono, monospace';
     }
-    if (error)
-      this._showInitError(error);
+    terminal.setOption('fontFamily', fontFamily);
+    terminal.setOption('fontSize', fontSize);
+    terminal.setOption('cursorStyle', 'bar');
+    return terminal;
   }
 
-  _showInitError(error) {
+  async _restartService() {
+    if (this._backend)
+      this._backend.dispose();
+    const nddStore = await (await Ndb.NodeProcessManager.instance()).nddStore();
+    this._backend = await backend.createService(
+        NdbProcessInfo.serviceDir + '/terminal.js',
+        rpc.handle(this),
+        nddStore,
+        NdbProcessInfo.preload,
+        this._terminal.cols,
+        this._terminal.rows);
+  }
+
+  /**
+   * @param {string} error
+   */
+  initFailed(error) {
     this.contentElement.removeChildren();
     this.contentElement.createChild('div').textContent = error;
   }
 
-  wasShown() {
-    if (this._terminalShownCallback) {
-      this._terminal = new Terminal();
+  /**
+   * @param {string} data
+   */
+  dataAdded(data) {
+    this._terminal.write(data);
+  }
 
-      let fontFamily;
-      let fontSize = 11;
-      if (Host.isMac()) {
-        fontFamily = 'Menlo, monospace';
-      } else if (Host.isWin()) {
-        fontFamily = 'Consolas, Lucida Console, Courier New, monospace';
-        fontSize = 12;
-      } else {
-        fontFamily = 'dejavu sans mono, monospace';
-      }
-      this._terminal.setOption('fontFamily', fontFamily);
-      this._terminal.setOption('fontSize', fontSize);
-      this._terminal.setOption('cursorStyle', 'bar');
+  closed() {
+    this._restartService();
+  }
 
-      this._terminal.open(this.contentElement);
-      this._terminalShownCallback(this._terminal);
-      delete this._terminalShownCallback;
-    }
-    this._terminal.fit();
+  /**
+   * @param {!{cols: number, rows: number}} size
+   */
+  _sendResize(size) {
+    if (this._backend)
+      this._backend.resize(size.cols, size.rows);
+  }
+
+  /**
+   * @param {string} data
+   */
+  _sendData(data) {
+    if (this._backend)
+      this._backend.write(data);
   }
 
   onResize() {
+    this._terminal.fit();
+  }
+
+  wasShown() {
     if (this._terminal)
-      this._terminal.fit();
+      return;
+    this._terminal = Ndb.Terminal._createTerminal();
+    this._terminal.open(this.contentElement);
+    this._terminal.on('resize', this._sendResize.bind(this));
+    this._terminal.on('data', this._sendData.bind(this));
+    this._restartService();
   }
 };

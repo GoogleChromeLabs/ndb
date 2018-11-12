@@ -4,61 +4,53 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-let pty;
-let error;
-try {
-  pty = require('ndb-node-pty-prebuilt');
-} catch (e) {
-  error = e.stack;
-}
-
 const fs = require('fs');
+const { rpc, rpc_process } = require('carlo/rpc');
 
-const {ServiceBase} = require('./service_base.js');
-
-const NDB_VERSION = require('../package.json').version;
-
-class Terminal extends ServiceBase {
-  init(params) {
-    if (!pty)
-      throw {message: error};
+class Terminal {
+  constructor(frontend, pty, nddStore, preload, cols, rows) {
     let shell = process.env.SHELL;
     if (!shell || !fs.existsSync(shell))
       shell = process.platform === 'win32' ? 'cmd.exe' : 'bash';
+    const NDB_VERSION = require('../package.json').version;
     this._term = pty.spawn(shell, [], {
       name: 'xterm-color',
-      cols: params.cols || 80,
-      rows: params.rows || 24,
+      cols: cols,
+      rows: rows,
       cwd: process.cwd(),
       env: {
         ...process.env,
-        NODE_OPTIONS: `--require ${params.preload}`,
-        NDD_STORE: params.nddStore,
+        NODE_OPTIONS: `--require ${preload}`,
+        NDD_STORE: nddStore,
         NDD_WAIT_FOR_CONNECTION: 1,
         NDB_VERSION
       }
     });
-
-    this._term.on('data', data => this._notify('data', {data}));
-    this._term.on('close', _ => this._notify('close'));
-    return Promise.resolve({});
+    this._term.on('data', data => frontend.dataAdded(data));
+    this._term.on('close', () => frontend.closed());
   }
 
   dispose() {
-    process.exit(0);
+    setTimeout(() => process.exit(0), 0);
   }
 
-  resize(params) {
-    if (this._term)
-      this._term.resize(params.cols, params.rows);
-    return Promise.resolve({});
+  resize(cols, rows) {
+    this._term.resize(cols, rows);
   }
 
-  write(params) {
-    if (this._term)
-      this._term.write(params.data);
-    return Promise.resolve({});
+  write(data) {
+    this._term.write(data);
   }
 }
 
-new Terminal();
+function init(frontend, nddStore, preload, cols, rows) {
+  try {
+    const pty = require('ndb-node-pty-prebuilt');
+    return rpc.handle(new Terminal(frontend, pty, nddStore, preload, cols, rows));
+  } catch (e) {
+    frontend.initFailed(e.stack);
+    process.exit(0);
+  }
+}
+
+rpc_process.init(args => init(...args.args));
