@@ -104,7 +104,7 @@ Ndb.NdbMain = class extends Common.Object {
     }
     const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
     setting.set([excludePattern, ...Ndb.NdbMain._defaultExcludePattern()].join('|'));
-    setExcludedPattern(excludePattern);
+    Runtime.searchServicePromise.then(service => service.setExcludedPattern(excludePattern));
 
     function populateFolders(folders, currentRoot) {
       const perParent = new Map();
