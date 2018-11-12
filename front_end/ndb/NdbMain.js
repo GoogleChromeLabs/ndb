@@ -180,72 +180,6 @@ Ndb.ContextMenuProvider = class {
   }
 };
 
-Ndb.ServiceManager = class {
-  constructor() {
-    this._runningServices = new Map();
-  }
-
-  async create(name) {
-    const {serviceId, error} = await createNdbService(name, NdbProcessInfo.serviceDir);
-    if (error) {
-      console.error(error);
-      return null;
-    }
-    const service = new Ndb.Service(serviceId);
-    this._runningServices.set(serviceId, service);
-    return service;
-  }
-
-  notify(notifications) {
-    for (const {serviceId, callId, payload} of notifications) {
-      const service = this._runningServices.get(serviceId);
-      if (service)
-        service._notify(callId, payload);
-      if (!callId && payload.method === 'disposed')
-        this._runningServices.delete(serviceId);
-    }
-  }
-};
-Ndb.serviceManager = new Ndb.ServiceManager();
-
-Ndb.Service = class extends Common.Object {
-  constructor(serviceId) {
-    super();
-    this._serviceId = serviceId;
-    this._lastCallId = 0;
-    this._callbacks = new Map();
-  }
-
-  call(method, options) {
-    const callId = ++this._lastCallId;
-    const promise = new Promise(resolve => this._callbacks.set(callId, resolve));
-    callNdbService({
-      serviceId: this._serviceId,
-      callId,
-      method,
-      options
-    });
-    return promise;
-  }
-
-  _notify(callId, payload) {
-    if (callId) {
-      const callback = this._callbacks.get(callId);
-      this._callbacks.delete(callId);
-      if (callback) {
-        const {result, error} = payload || {};
-        callback(error || !result ? {error} : result);
-      }
-    } else {
-      this.dispatchEventToListeners(Ndb.Service.Events.Notification, payload);
-    }
-  }
-};
-
-Ndb.Service.Events = {
-  Notification: Symbol('notification')
-};
-
 Ndb.NodeProcessManager = class extends Common.Object {
   /**
    * @return {!Promise<!Ndb.NodeProcessManager>}
@@ -261,11 +195,12 @@ Ndb.NodeProcessManager = class extends Common.Object {
   }
 
   static async _create() {
-    const service = await Ndb.serviceManager.create('ndd_service');
+    const service = await backend.createService(
+        NdbProcessInfo.serviceDir + '/ndd_service.js');
     const instance = new Ndb.NodeProcessManager(SDK.targetManager, service);
-    instance._nddStore = await service.call('init', {
-      nddSharedStore: NdbProcessInfo.nddSharedStore
-    });
+    instance._nddStore = await service.init(
+        rpc.handle(instance),
+        NdbProcessInfo.nddSharedStore);
     Ndb.NodeProcessManager._instanceReady(instance);
     delete Ndb.NodeProcessManager._instanceReady;
   }
@@ -275,7 +210,6 @@ Ndb.NodeProcessManager = class extends Common.Object {
     this._targetManager = targetManager;
 
     this._nddService = nddService;
-    this._nddService.addEventListener(Ndb.Service.Events.Notification, this._onNotification.bind(this));
 
     this._processes = new Map();
     this._connections = new Map();
@@ -296,7 +230,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
       this._onProcessAdded(params);
   }
 
-  async _onProcessAdded(payload) {
+  detected(payload, connection) {
     const pid = payload.id;
     const processInfo = new Ndb.ProcessInfo(payload);
     this._processes.set(pid, processInfo);
@@ -304,7 +238,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
     const parentTarget = payload.ppid ? this._targetManager.targetById(payload.ppid) : this._targetManager.mainTarget();
     const target = this._targetManager.createTarget(
         pid, processInfo.userFriendlyName(), SDK.Target.Capability.JS,
-        this._createConnection.bind(this, pid),
+        this._createConnection.bind(this, connection),
         parentTarget, true);
     if (this._shouldPauseAtStart(payload.argv)) {
       target.runtimeAgent().invoke_evaluate({
@@ -315,15 +249,8 @@ Ndb.NodeProcessManager = class extends Common.Object {
     return target.runtimeAgent().runIfWaitingForDebugger();
   }
 
-  _createConnection(id, params) {
-    const connection = new Ndb.Connection(id, this._nddService, this._onWebSocketDisconnected.bind(this, id), params);
-    this._connections.set(id, connection);
-    return connection;
-  }
-
-  _onWebSocketDisconnected(id) {
-    this._connections.delete(id);
-    this._processes.delete(id);
+  _createConnection(connection, params) {
+    return new Ndb.Connection(connection, params);
   }
 
   _shouldPauseAtStart(argv) {
@@ -350,9 +277,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
       await new Promise(resolve => debuggerModel.addEventListener(
           SDK.DebuggerModel.Events.DebuggerWasEnabled, resolve));
     }
-    const connection = this._connections.get(executionContext.target().id());
-    if (connection)
-      connection.disconnect();
+    target._connection.disconnect();
   }
 
   infoForTarget(target) {
@@ -362,19 +287,16 @@ Ndb.NodeProcessManager = class extends Common.Object {
   debug(execPath, args) {
     const debugId = String(++this._lastDebugId);
     this._lastStarted = {execPath, args, debugId};
-    return this._nddService.call('debug', {
-      execPath, args, options: {
-        data: debugId,
-        cwd: NdbProcessInfo.cwd,
-        preload: NdbProcessInfo.preload
-      }
-    });
+    return this._nddService.debug(
+        execPath, args, {
+          data: debugId,
+          cwd: NdbProcessInfo.cwd,
+          preload: NdbProcessInfo.preload
+        });
   }
 
   kill(target) {
-    return this._nddService.call('kill', {
-      id: target.id()
-    });
+    return this._nddService.kill(target.id());
   }
 
   async restartLast() {
@@ -398,22 +320,19 @@ Ndb.NodeProcessManager = class extends Common.Object {
  * @implements {Protocol.InspectorBackend.Connection}
  */
 Ndb.Connection = class {
-  constructor(pid, nddService, onWebSocketDisconnect, params) {
-    this._pid = pid;
-    this._nddService = nddService;
+  constructor(connection, params) {
     this._onDisconnect = params.onDisconnect;
     this._onMessage = params.onMessage;
-    this._onWebSocketDisconnect = onWebSocketDisconnect;
-    this._nddService.addEventListener(Ndb.Service.Events.Notification, this._onServiceNotification.bind(this));
+    this._connection = connection;
+    this._connection.setClient(rpc.handle(this));
   }
 
-  _onServiceNotification({data: {name, params}}) {
-    if (name === 'message' && params.id === this._pid)
-      this._onMessage.call(null, params.message);
-    if (name === 'disconnected' && params.id === this._pid) {
-      this._onWebSocketDisconnect.call(null);
-      this._onDisconnect.call(null, 'websocket closed');
-    }
+  messageReceived(message) {
+    this._onMessage.call(null, message);
+  }
+
+  closed() {
+    this._onDisconnect.call(null, 'websocket closed');
   }
 
   /**
@@ -421,18 +340,14 @@ Ndb.Connection = class {
    * @param {!Protocol.InspectorBackend.Connection.MessageObject} messageObject
    */
   sendMessage(domain, messageObject) {
-    return this._nddService.call('send', {
-      id: this._pid,
-      message: JSON.stringify(messageObject)
-    });
+    return this._connection.send(JSON.stringify(messageObject));
   }
 
   /**
    * @return {!Promise}
    */
   disconnect() {
-    return this._nddService.call('disconnect', {id: this._pid})
-        .then(_ => this._onDisconnect.call(null, 'force disconnect'));
+    return this._connection.disconnect();
   }
 };
 

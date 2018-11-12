@@ -4,7 +4,8 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-const {spawn} = require('child_process');
+const { rpc, rpc_process } = require('carlo/rpc');
+const { spawn } = require('child_process');
 const chokidar = require('chokidar');
 const fs = require('fs');
 const http = require('http');
@@ -14,24 +15,68 @@ const util = require('util');
 const url = require('url');
 const WebSocket = require('ws');
 
-const {ServiceBase} = require('./service_base.js');
-
 const NDB_VERSION = require('../package.json').version;
 
 const fsMkdtemp = util.promisify(fs.mkdtemp);
 const fsReadFile = util.promisify(fs.readFile);
 const removeFolder = util.promisify(require('rimraf'));
 
-class NddService extends ServiceBase {
+class Connection {
+  constructor(ws) {
+    this._ws = ws;
+    this._ws.on('error', this._error.bind(this));
+    this._ws.on('message', this._message.bind(this));
+    this._ws.once('close', this._close.bind(this));
+    this._buffer = [];
+  }
+
+  _error() {}
+
+  /**
+   * @param {string} message
+   */
+  _message(message) {
+    if (this._client)
+      this._client.messageReceived(message);
+    else
+      this._buffer.push(this._message.bind(this, message));
+  }
+
+  _close() {
+    if (this._client)
+      this._client.closed();
+    else
+      this._buffer.push(this._close.bind(this));
+  }
+
+  setClient(client) {
+    this._client = client;
+    this._buffer.splice(0).forEach(action => action());
+  }
+
+  /**
+   * @param {string} message
+   */
+  send(message) {
+    return new Promise(resolve => this._ws.send(message, resolve));
+  }
+
+  disconnect() {
+    this._ws.close();
+  }
+}
+
+class NddService {
   constructor() {
-    super();
     this._nddStores = [];
     this._nddStoreWatchers = [];
     this._running = new Set();
     this._sockets = new Map();
+    this._frontend = null;
   }
 
-  async init({nddSharedStore}) {
+  async init(frontend, nddSharedStore) {
+    this._frontend = frontend;
     this._nddStores = [await fsMkdtemp(path.join(os.tmpdir(), 'ndb-'))];
     if (nddSharedStore)
       this._nddStores.push(nddSharedStore);
@@ -64,33 +109,13 @@ class NddService extends ServiceBase {
         webSocketDebuggerUrl = url.format(wsUrl);
       }
       const ws = new WebSocket(webSocketDebuggerUrl);
-      ws.on('error', _ => 0);
-      ws.once('open', _ => {
-        this._sockets.set(id, ws);
-        this._notify('added', {...info, id});
-      });
-      ws.on('message', message => this._notify('message', {message, id}));
-      ws.once('close', _ => {
-        this._sockets.delete(id);
-        this._notify('disconnected', {id});
-      });
+      const conn = new Connection(ws);
+      ws.once('open', () => this._frontend.detected({...info, id}, rpc.handle(conn)));
     } catch (e) {
     }
   }
 
-  async disconnect({id}) {
-    const ws = this._sockets.get(id);
-    if (ws)
-      ws.close();
-  }
-
-  async send({id, message}) {
-    const ws = this._sockets.get(id);
-    if (ws)
-      return new Promise(resolve => ws.send(message, resolve));
-  }
-
-  async _fetch(url) {
+  _fetch(url) {
     return new Promise(resolve => {
       http.get(url, res => {
         if (res.statusCode !== 200) {
@@ -128,7 +153,7 @@ class NddService extends ServiceBase {
     }
   }
 
-  async debug({execPath, args, options}) {
+  debug(execPath, args, options) {
     const env = {
       NODE_OPTIONS: `--require ${options.preload}`,
       NDD_STORE: this._nddStores[0],
@@ -160,7 +185,7 @@ class NddService extends ServiceBase {
     }).then(_ => fs.unlink(path.join(this._nddStores[0], String(p.pid)), err => 0));
   }
 
-  async kill({id}) {
+  kill(id) {
     if (!this._running.has(id))
       return;
     process.kill(id, 'SIGKILL');
@@ -169,4 +194,4 @@ class NddService extends ServiceBase {
   }
 }
 
-new NddService();
+rpc_process.init(args => rpc.handle(new NddService()));
