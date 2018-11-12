@@ -1,4 +1,4 @@
-# ndb
+# ndb makes debugging Node.js nbd
 
 <!-- [START badges] -->
 [![NPM ndb package](https://img.shields.io/npm/v/ndb.svg)](https://npmjs.org/package/ndb)
@@ -6,7 +6,7 @@
 
 <img src="https://raw.githubusercontent.com/ChromeDevTools/devtools-logo/master/192.png" height="200" align="right">
 
-> ndb is an improved debugging experience for Node.js, enabled by Chrome DevTools
+> ndb is an improved debugging experience for Node.js, enabled by Chrome DevTool
 
 ## Installation
 
