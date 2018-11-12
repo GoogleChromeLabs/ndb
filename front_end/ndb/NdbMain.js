@@ -195,7 +195,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
   }
 
   static async _create() {
-    const service = await backend.createService(
+    const service = await (await Runtime.backendPromise).createService(
         NdbProcessInfo.serviceDir + '/ndd_service.js');
     const instance = new Ndb.NodeProcessManager(SDK.targetManager, service);
     instance._nddStore = await service.init(
