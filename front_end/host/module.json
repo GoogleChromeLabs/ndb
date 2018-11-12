@@ -6,7 +6,6 @@
     "scripts": [
         "InspectorFrontendHostAPI.js",
         "InspectorFrontendHost.js",
-        "FileSystem.js",
         "InspectorFrontendHostOverrides.js",
         "Platform.js",
         "ResourceLoader.js",

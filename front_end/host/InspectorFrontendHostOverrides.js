@@ -5,7 +5,7 @@
  */
 
 (function(){
-  Runtime.backendPromise = new Promise(resolve => self.load = backend => {
+  Runtime.backendPromise = Runtime.backendPromise || new Promise(resolve => self.load = backend => {
     delete self.load;
     resolve(backend);
   });
@@ -15,7 +15,6 @@
   InspectorFrontendHost.isHostedMode = _ => false;
   InspectorFrontendHost.copyText = text => servicePromise.then(service => service.copyText(String(text)));
   InspectorFrontendHost.openInNewTab = url => servicePromise.then(service => service.openInNewTab(url));
-  InspectorFrontendHost.isolatedFileSystem = name => new self.FileSystem(name);
   InspectorFrontendHost.getPreferences = f => {
     const threads = runtime._extensions.find(e => e._descriptor.className === 'Sources.ThreadsSidebarPane');
     threads._descriptor.className = 'UI.Widget';
