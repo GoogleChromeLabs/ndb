@@ -209,6 +209,8 @@ class SearchBackend {
     result = result.map(index => this._indexToFileName.get(index));
     this._frontend.searchCompleted(requestId, fileSystemPath, result);
   }
+
+  dispose() {}
 }
 
 rpc_process.init(args => rpc.handle(new SearchBackend(args.args[0])));
