@@ -24,7 +24,7 @@
   InspectorFrontendHost.setPreference = (name, value) => servicePromise.then(service => service.setPreference(name, value));
   InspectorFrontendHost.removePreference = name => servicePromise.then(service => service.removePreference(name));
   InspectorFrontendHost.clearPreferences = () => servicePromise.then(service => service.clearPreferences());
-  InspectorFrontendHost.bringToFront = bringToFront;
+  InspectorFrontendHost.bringToFront = () => Runtime.backendPromise.then(backend => backend.bringToFront());
 
   class SearchClient {
     /**

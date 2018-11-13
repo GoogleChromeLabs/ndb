@@ -7,8 +7,7 @@
 const { rpc, rpc_process } = require('carlo/rpc');
 const chokidar = require('chokidar');
 const fs = require('fs');
-const path = require('path');
-const { URL, pathToFileURL, fileURLToPath } = require('url');
+const { URL, fileURLToPath } = require('url');
 
 class FileSystemHandler {
   constructor() {
@@ -21,7 +20,7 @@ class FileSystemHandler {
   filePaths(fileURL, excludePattern) {
     let excludeRegex = null;
     try {
-      excludeRegex = new RegExp(excludePattern); 
+      excludeRegex = new RegExp(excludePattern);
     } catch (e) {
     }
     const queue = [new URL(fileURL)];
@@ -43,11 +42,10 @@ class FileSystemHandler {
         names.forEach(name => {
           if (name === '.git') gitFolders.add(urlString.substr(fileURL.length + 1));
           const fileName = urlString + '/' + name;
-          if (excludeRegex && excludeRegex.test(fileName.substr(fileURL.length))) {
+          if (excludeRegex && excludeRegex.test(fileName.substr(fileURL.length)))
             excludedFolders.add(fileName.substr(fileURL.length + 1));
-          } else {
+          else
             queue.push(new URL(fileName));
-          }
         });
       } catch (e) {
         if (e.code !== 'ENOTDIR')
@@ -78,9 +76,8 @@ class FileSystemHandler {
    * @param {string} encoding
    */
   writeFile(fileURL, content, encoding) {
-    if (encoding === 'base64') {
+    if (encoding === 'base64')
       content = Buffer.from(content, 'base64');
-    }
     fs.writeFileSync(new URL(fileURL), content, {encoding: encoding});
   }
 
@@ -146,8 +143,11 @@ class FileSystemHandler {
     });
     this._watcher = watcher;
   }
+
+  dispose() {
+    this._watcher.close();
+    process.exit(0);
+  }
 }
 
-rpc_process.init(args => {
-  return rpc.handle(new FileSystemHandler());
-});
+rpc_process.init(args => rpc.handle(new FileSystemHandler()));

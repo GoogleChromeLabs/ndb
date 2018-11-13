@@ -112,6 +112,8 @@ class InspectorFrontendHost {
   clearPreferences() {
     return this._preferences.clearPreferences();
   }
+
+  dispose() {}
 }
 
 rpc_process.init(args => rpc.handle(new InspectorFrontendHost(args.args[0])));

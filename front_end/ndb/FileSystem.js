@@ -164,7 +164,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
     if (Persistence.IsolatedFileSystem._scriptExtensions.has(extension))
       return Common.resourceTypes.Script;
     return Persistence.IsolatedFileSystem.BinaryExtensions.has(extension) ? Common.resourceTypes.Other :
-                                                                            Common.resourceTypes.Document;
+      Common.resourceTypes.Document;
   }
 
   /**
@@ -254,4 +254,4 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
   supportsAutomapping() {
     return true;
   }
-}
+};

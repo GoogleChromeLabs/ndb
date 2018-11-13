@@ -439,7 +439,7 @@ Bindings.CompilerScriptMapping.prototype._sourceMapDetached = function(event) {
  * @this {SDK.TextSourceMap}
  */
 SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
-  const {payload, error} = await loadSourceMap(sourceMapURL, compiledURL);
+  const {payload, error} = await (await Runtime.backendPromise).loadSourceMap(sourceMapURL, compiledURL);
   if (error || !payload)
     return null;
   try {
