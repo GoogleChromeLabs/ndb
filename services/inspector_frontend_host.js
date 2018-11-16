@@ -12,7 +12,6 @@ const path = require('path');
 const fsReadFile = util.promisify(fs.readFile);
 const fsWriteFile = util.promisify(fs.writeFile);
 
-const clipboardy = require('clipboardy');
 const opn = require('opn');
 
 class Preferences {
@@ -85,12 +84,6 @@ class InspectorFrontendHost {
     require('../lib/process_utility.js')(() => this.dispose());
   }
 
-  /**
-   * @param {string} text
-   */
-  copyText(text) {
-    clipboardy.write(text);
-  }
   /**
    * @param {text} url
    */

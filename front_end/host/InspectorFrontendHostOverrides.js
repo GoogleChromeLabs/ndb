@@ -13,7 +13,7 @@
     Runtime.backendPromise.then(backend => backend.createService(info.serviceDir + '/inspector_frontend_host.js', info.configDir)));
 
   InspectorFrontendHost.isHostedMode = _ => false;
-  InspectorFrontendHost.copyText = text => servicePromise.then(service => service.copyText(String(text)));
+  InspectorFrontendHost.copyText = text => navigator.clipboard.writeText(text);
   InspectorFrontendHost.openInNewTab = url => servicePromise.then(service => service.openInNewTab(url));
   InspectorFrontendHost.getPreferences = f => {
     const threads = runtime._extensions.find(e => e._descriptor.className === 'Sources.ThreadsSidebarPane');
