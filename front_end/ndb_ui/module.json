@@ -24,21 +24,12 @@
           "title": "Node processes",
           "persistence": "permanent",
           "className": "Ndb.NodeProcesses"
-      },
-      {
-          "type": "view",
-          "location": "settings-view",
-          "id": "node_modules_blackbox",
-          "title": "Node modules",
-          "order": 7,
-          "className": "Ndb.NodeModulesBlackboxing"
       }
   ],
   "dependencies": ["ui", "sources", "timeline"],
   "scripts": [
       "RunConfiguration.js",
       "NodeProcesses.js",
-      "NodeModulesBlackboxing.js",
       "../node_modules/xterm/dist/xterm.js",
       "../node_modules/xterm/dist/addons/fit/fit.js",
       "Terminal.js"
@@ -46,7 +37,6 @@
   "resources": [
       "runConfiguration.css",
       "nodeProcesses.css",
-      "nodeModulesBlackboxing.css",
       "../node_modules/xterm/dist/xterm.css"
   ]
 }

@@ -22,9 +22,12 @@ Ndb.NdbMain = class extends Common.Object {
     InspectorFrontendAPI.setUseSoftMenu(true);
     document.title = 'ndb';
     self.NdbProcessInfo = await getProcessInfo();
-    Common.moduleSetting('blackboxAnythingOutsideCwd').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
-    Common.moduleSetting('whitelistedModules').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
+    Common.moduleSetting('blackboxInternalScripts').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
     Ndb.NdbMain._calculateBlackboxState();
+
+    const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
+    setting.set([Ndb.NdbMain._defaultExcludePattern()].join('|'));
+    Runtime.searchServicePromise.then(service => service.setExcludedPattern(setting.get()));
 
     // Create root Main target.
     const stubConnection = new SDK.StubConnection({onMessage: _ => 0, onDisconnect: _ => 0});
@@ -65,64 +68,11 @@ Ndb.NdbMain = class extends Common.Object {
   }
 
   static _calculateBlackboxState() {
-    const whitelistOnlyProject = Common.moduleSetting('blackboxAnythingOutsideCwd').get();
-    const whitelistModules = Common.moduleSetting('whitelistedModules').get().split(',');
-
-    // ^(?!cwd|[eval]|f(cwd)|f([eval]))|^(cwd/node_modules/|f(cwd/node_modules/))(?!(module1|module2|...))
-    const escapedCwd = NdbProcessInfo.cwd.replace(/\\/g, '\\\\');
-    const cwdUrl = Common.ParsedURL.platformPathToURL(NdbProcessInfo.cwd);
-
-    let pattern = '';
-    if (whitelistOnlyProject)
-      pattern += `^(?!${escapedCwd}|\\[eval\\]|${cwdUrl}|file:///\\[eval\\])`;
-    pattern += `${pattern.length > 0 ? '|' : ''}^(` +
-      `${escapedCwd}[/\\\\]node_modules[/\\\\]|` +
-      `${cwdUrl}/node_modules/)${whitelistModules.length > 0 ? `(?!${whitelistModules.join('|')})` : ''}`;
-
+    const blackboxInternalScripts = Common.moduleSetting('blackboxInternalScripts').get();
     const regexPatterns = Common.moduleSetting('skipStackFramesPattern').getAsArray()
-        .filter(({pattern}) => !pattern.includes(`\\[eval\\]`) && pattern !== `node_debug_demon[\\/]preload\\.js`);
-    regexPatterns.push({pattern: pattern });
-    regexPatterns.push({pattern: `node_debug_demon[\\/]preload\\.js`});
+        .filter(({pattern}) => pattern !== '^internal[\\/].*');
+    regexPatterns.push({pattern: '^internal/.*' });
     Common.moduleSetting('skipStackFramesPattern').setAsArray(regexPatterns);
-
-    let excludePattern;
-    if (NdbProcessInfo.pkg) {
-      if (whitelistModules.length > 0) {
-        const root = {name: 'node_modules', subfolders: []};
-        populateFolders(whitelistModules, root);
-        excludePattern = `^/node_modules/(?!($|${root.subfolders.map(generatePattern).join('|')}))`;
-      } else {
-        excludePattern = `^/node_modules/`;
-      }
-    } else {
-      excludePattern = '^/[^/]+/[^/]+/[^/]+/';
-    }
-    const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
-    setting.set([excludePattern, ...Ndb.NdbMain._defaultExcludePattern()].join('|'));
-    Runtime.searchServicePromise.then(service => service.setExcludedPattern(excludePattern));
-
-    function populateFolders(folders, currentRoot) {
-      const perParent = new Map();
-      for (const folder of folders) {
-        const [parent, ...tail] = folder.split('/');
-        if (!perParent.has(parent))
-          perParent.set(parent, [tail.join('/')]);
-        else
-          perParent.get(parent).push(tail.join('/'));
-      }
-      for (const [parent, tails] of perParent) {
-        const node = {name: parent, subfolders: []};
-        if (tails.filter(a => a.length).length)
-          populateFolders(tails, node);
-        currentRoot.subfolders.push(node);
-      }
-    }
-
-    function generatePattern(node) {
-      if (!node.subfolders || !node.subfolders.length)
-        return `${node.name}/`;
-      return `${node.name}/($|${node.subfolders.map(generatePattern).join('|')})`;
-    }
   }
 };
 
@@ -251,14 +201,12 @@ Ndb.NodeProcessManager = class extends Common.Object {
   _shouldPauseAtStart(argv) {
     if (!Common.moduleSetting('pauseAtStart').get())
       return false;
-    if (Common.moduleSetting('blackboxAnythingOutsideCwd').get()) {
-      const [_, arg] = argv;
-      if (arg && (arg === NdbProcessInfo.repl ||
-          arg.endsWith('/bin/npm') || arg.endsWith('\\bin\\npm') ||
-          arg.endsWith('/bin/yarn') || arg.endsWith('\\bin\\yarn') ||
-          arg.endsWith('/bin/npm-cli.js') || arg.endsWith('\\bin\\npm-cli.js')))
-        return false;
-    }
+    const [_, arg] = argv;
+    if (arg && (arg === NdbProcessInfo.repl ||
+        arg.endsWith('/bin/npm') || arg.endsWith('\\bin\\npm') ||
+        arg.endsWith('/bin/yarn') || arg.endsWith('\\bin\\yarn') ||
+        arg.endsWith('/bin/npm-cli.js') || arg.endsWith('\\bin\\npm-cli.js')))
+      return false;
     return true;
   }
 

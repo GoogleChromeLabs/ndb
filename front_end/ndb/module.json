@@ -14,12 +14,6 @@
         },
         {
             "type": "setting",
-            "settingName": "whitelistedModules",
-            "settingType": "string",
-            "defaultValue": ""
-        },
-        {
-            "type": "setting",
             "category": "Debugger",
             "title": "Autostart main",
             "settingName": "autoStartMain",
@@ -29,8 +23,8 @@
         {
             "type": "setting",
             "category": "Debugger",
-            "title": "Blackbox anything outside working directory",
-            "settingName": "blackboxAnythingOutsideCwd",
+            "title": "Blackbox internal/* Node.js scripts",
+            "settingName": "blackboxInternalScripts",
             "settingType": "boolean",
             "defaultValue": true
         },
