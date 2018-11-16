@@ -101,8 +101,9 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    * @param {function(?string,boolean)} callback
    */
   async requestFileContent(path, callback) {
-    const result = await (await this._service()).readFile(this._rootURL + path, 'utf8');
-    callback(result, false);
+    const result = await (await this._service()).readFile(this._rootURL + path, 'base64');
+    const content = await(await fetch(`data:application/octet-stream;base64,${result}`)).text();
+    callback(content, false);
   }
 
   /**
@@ -112,8 +113,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    * @param {boolean} isBase64
    */
   async setFileContent(path, content, isBase64) {
-    console.log(this._rootURL + path);
-    await (await this._service()).writeFile(this._rootURL + path, content, isBase64 ? 'base64' : 'utf8');
+    await (await this._service()).writeFile(this._rootURL + path, isBase64 ? content : content.toBase64(), 'base64');
   }
 
   /**
