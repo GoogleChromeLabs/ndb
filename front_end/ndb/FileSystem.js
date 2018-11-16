@@ -42,7 +42,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
   async _initFilePaths() {
     const excludePattern = this._manager.workspaceFolderExcludePatternSetting().get();
     const service = await this._service();
-    await service.startWatcher(this._rootURL, rpc.handle(this));
+    await service.startWatcher(this._embedderPath, rpc.handle(this));
     const result = await service.filePaths(this._rootURL, excludePattern);
     this._initialFilePaths = result.filePaths;
     this._initialGitFolders = result.gitFolders;
@@ -222,7 +222,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
   filesChanged(events) {
     for (const event of events) {
       const paths = new Multimap();
-      paths.set(this._rootURL, event.name);
+      paths.set(this._rootURL, Common.ParsedURL.platformPathToURL(event.name));
       const emptyMap = new Multimap();
       Persistence.isolatedFileSystemManager.dispatchEventToListeners(Persistence.IsolatedFileSystemManager.Events.FileSystemFilesChanged, {
         changed: event.type === 'change' ? paths : emptyMap,
