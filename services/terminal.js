@@ -28,10 +28,11 @@ class Terminal {
     });
     this._term.on('data', data => frontend.dataAdded(data));
     this._term.on('close', () => frontend.closed());
+    process.on('disconnect', () => this.dispose());
   }
 
   dispose() {
-    setTimeout(() => process.exit(0), 0);
+    Promise.resolve().then(() => process.exit(0));
   }
 
   resize(cols, rows) {
