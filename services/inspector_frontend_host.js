@@ -82,6 +82,7 @@ class Preferences {
 class InspectorFrontendHost {
   constructor(configDir) {
     this._preferences = new Preferences(configDir);
+    process.on('disconnect', () => this.dispose());
   }
 
   /**
@@ -113,7 +114,9 @@ class InspectorFrontendHost {
     return this._preferences.clearPreferences();
   }
 
-  dispose() {}
+  dispose() {
+    Promise.resolve().then(() => process.exit(0));
+  }
 }
 
 rpc_process.init(args => rpc.handle(new InspectorFrontendHost(args.args[0])));

@@ -24,6 +24,7 @@ class SearchBackend {
     this._fileNameToIndex = new Map();
 
     this._excludeRegex = null;
+    process.on('disconnect', () => process.exit(0));
   }
 
   setExcludedPattern(pattern) {
@@ -210,7 +211,9 @@ class SearchBackend {
     this._frontend.searchCompleted(requestId, fileSystemPath, result);
   }
 
-  dispose() {}
+  dispose() {
+    Promise.resolve().then(() => process.exit(0));
+  }
 }
 
 rpc_process.init(args => rpc.handle(new SearchBackend(args.args[0])));

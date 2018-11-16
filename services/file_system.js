@@ -12,6 +12,7 @@ const { URL, fileURLToPath } = require('url');
 class FileSystemHandler {
   constructor() {
     this._watcher = null;
+    process.on('disconnect', () => this.dispose());
   }
   /**
    * @param {string} fileURL
@@ -146,7 +147,7 @@ class FileSystemHandler {
 
   dispose() {
     this._watcher.close();
-    process.exit(0);
+    Promise.resolve().then(() => process.exit(0));
   }
 }
 
