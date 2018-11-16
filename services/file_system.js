@@ -7,7 +7,7 @@
 const { rpc, rpc_process } = require('carlo/rpc');
 const chokidar = require('chokidar');
 const fs = require('fs');
-const { URL, fileURLToPath, pathToFileURL } = require('url');
+const { URL } = require('url');
 
 class FileSystemHandler {
   constructor() {
@@ -123,8 +123,8 @@ class FileSystemHandler {
     }
   }
 
-  startWatcher(rootURL, client) {
-    const watcher = chokidar.watch([fileURLToPath(rootURL)], {
+  startWatcher(embedderPath, client) {
+    const watcher = chokidar.watch([embedderPath], {
       ignoreInitial: true,
       awaitWriteFinish: {
         stabilityThreshold: 500,
@@ -142,7 +142,7 @@ class FileSystemHandler {
           timer = setTimeout(filesChanged, 100);
         events.push({
           type: event,
-          name: pathToFileURL(name).toString()
+          name: name
         });
       }
       if (event === 'addDir')
