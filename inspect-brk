@@ -15,8 +15,8 @@ const nddStoreDir = path.join(ndbDir, 'ndd_store');
 if (!fs.existsSync(nddStoreDir))
   fs.mkdirSync(nddStoreDir);
 
-process.env.NDD_STORE = path.join(os.homedir(), '.ndb', 'ndd_store');
+process.env.NDD_STORE = nddStoreDir;
 process.env.NDD_WAIT_FOR_CONNECTION = 1;
-process.env.NODE_OPTIONS = (process.env.NODE_OPTIONS || '') + ' -r ndb-inspect/brk';
+process.env.NODE_OPTIONS = (process.env.NODE_OPTIONS || '') + ' -r ndb/inspect-brk';
 
-require('./preload.js');
+require('./lib/preload.js');
