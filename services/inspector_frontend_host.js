@@ -82,7 +82,7 @@ class Preferences {
 class InspectorFrontendHost {
   constructor(configDir) {
     this._preferences = new Preferences(configDir);
-    process.on('disconnect', () => this.dispose());
+    require('../lib/process_utility.js')(() => this.dispose());
   }
 
   /**

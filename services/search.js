@@ -24,7 +24,7 @@ class SearchBackend {
     this._fileNameToIndex = new Map();
 
     this._excludeRegex = null;
-    process.on('disconnect', () => process.exit(0));
+    require('../lib/process_utility.js')(() => this.dispose());
   }
 
   setExcludedPattern(pattern) {
