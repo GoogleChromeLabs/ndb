@@ -28,7 +28,7 @@ class Terminal {
     });
     this._term.on('data', data => frontend.dataAdded(data));
     this._term.on('close', () => frontend.closed());
-    process.on('disconnect', () => this.dispose());
+    require('../lib/process_utility.js')(() => this.dispose());
   }
 
   dispose() {

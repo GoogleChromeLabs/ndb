@@ -73,7 +73,7 @@ class NddService {
     this._running = new Set();
     this._sockets = new Map();
     this._frontend = null;
-    process.on('disconnect', () => this.dispose());
+    require('../lib/process_utility.js')(() => this.dispose());
   }
 
   async init(frontend, nddSharedStore) {

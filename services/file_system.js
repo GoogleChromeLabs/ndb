@@ -12,7 +12,7 @@ const { URL, fileURLToPath } = require('url');
 class FileSystemHandler {
   constructor() {
     this._watcher = null;
-    process.on('disconnect', () => this.dispose());
+    require('../lib/process_utility.js')(() => this.dispose());
   }
   /**
    * @param {string} fileURL
