@@ -7,7 +7,7 @@
 const { rpc, rpc_process } = require('carlo/rpc');
 const chokidar = require('chokidar');
 const fs = require('fs');
-const { URL, fileURLToPath } = require('url');
+const { URL, fileURLToPath, pathToFileURL } = require('url');
 
 class FileSystemHandler {
   constructor() {
@@ -133,16 +133,27 @@ class FileSystemHandler {
       depth: 0,
       ignorePermissionErrors: true
     });
-    watcher.on('error', console.error);
+    const SUBSCRIPTION = new Set(['add', 'change', 'unlink']);
+    const events = [];
+    let timer = null;
     watcher.on('all', (event, name) => {
-      if (event === 'add' || event === 'addDir')
-        client.added(name);
-      else if (event === 'change')
-        client.changed(name);
-      else if (event === 'unlink' || event === 'unlinkDir')
-        client.removed(name);
+      if (SUBSCRIPTION.has(event)) {
+        if (!timer)
+          timer = setTimeout(filesChanged, 100);
+        events.push({
+          type: event,
+          name: pathToFileURL(name).toString()
+        });
+      }
+      if (event === 'addDir')
+        watcher.add(name);
     });
     this._watcher = watcher;
+
+    function filesChanged() {
+      client.filesChanged(events.splice(0));
+      timer = null;
+    }
   }
 
   dispose() {
