@@ -219,22 +219,17 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
   /**
    * @param {string} name
    */
-  added(name) {
-    InspectorFrontendAPI.fileSystemFilesChangedAddedRemoved([], [name], []);
-  }
-
-  /**
-   * @param {string} name
-   */
-  changed(name) {
-    InspectorFrontendAPI.fileSystemFilesChangedAddedRemoved([name], [], []);
-  }
-
-  /**
-   * @param {string} name
-   */
-  removed(name) {
-    InspectorFrontendAPI.fileSystemFilesChangedAddedRemoved([], [], [name]);
+  filesChanged(events) {
+    for (const event of events) {
+      const paths = new Multimap();
+      paths.set(this._rootURL, event.name);
+      const emptyMap = new Multimap();
+      Persistence.isolatedFileSystemManager.dispatchEventToListeners(Persistence.IsolatedFileSystemManager.Events.FileSystemFilesChanged, {
+        changed: event.type === 'change' ? paths : emptyMap,
+        added: event.type === 'add' ? paths : emptyMap,
+        removed: event.type === 'unlink' ? paths : emptyMap
+      });
+    }
   }
 
   /**
