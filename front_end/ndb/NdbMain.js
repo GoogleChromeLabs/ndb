@@ -71,7 +71,8 @@ Ndb.NdbMain = class extends Common.Object {
     const blackboxInternalScripts = Common.moduleSetting('blackboxInternalScripts').get();
     const regexPatterns = Common.moduleSetting('skipStackFramesPattern').getAsArray()
         .filter(({pattern}) => pattern !== '^internal[\\/].*');
-    regexPatterns.push({pattern: '^internal/.*' });
+    if (blackboxInternalScripts)
+      regexPatterns.push({pattern: '^internal/.*' });
     Common.moduleSetting('skipStackFramesPattern').setAsArray(regexPatterns);
   }
 };
@@ -398,3 +399,19 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
     return null;
   }
 };
+
+(async function() {
+  if (!Runtime.queryParam('debugFrontend'))
+    return;
+  const [info, backend] = await Promise.all([getProcessInfo(), Runtime.backendPromise]);
+  const service = await backend.createService(info.serviceDir + '/ping.js');
+  checkBackend();
+
+  async function checkBackend() {
+    const timeout = setTimeout(() => window.close(), 3000);
+    service.ping().then(() => {
+      clearTimeout(timeout);
+      setTimeout(checkBackend, 3000);
+    });
+  }
+})();
