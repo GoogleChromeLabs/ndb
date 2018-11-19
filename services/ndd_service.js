@@ -50,6 +50,9 @@ class NddService {
       watcher.on('add', this._onAdded.bind(this, nddStore));
       watcher.on('unlink', id => this._running.delete(id));
     }
+  }
+
+  nddStore() {
     return this._nddStores[0];
   }
 

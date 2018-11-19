@@ -38,7 +38,6 @@ Ndb.NdbMain = class extends Common.Object {
     await new Promise(resolve => SDK.initMainConnection(resolve));
     // Create root Main target.
     SDK.targetManager.createTarget('<root>', ls`Root`, SDK.Target.Type.Browser, null);
-    await Ndb.nodeProcessManager.start();
 
     this._startRepl();
 
@@ -146,7 +145,6 @@ Ndb.NodeProcessManager = class extends Common.Object {
   constructor(targetManager) {
     super();
     this._servicePromise = null;
-    this._nddStore = null;
     this._connection = null;
     this._processes = new Map();
     this._lastDebugId = 0;
@@ -156,16 +154,9 @@ Ndb.NodeProcessManager = class extends Common.Object {
         SDK.RuntimeModel, SDK.RuntimeModel.Events.ExecutionContextDestroyed, this._onExecutionContextDestroyed, this);
   }
 
-  async start() {
+  async nddStore() {
     const service = await this._service();
-    const environment = await Ndb.environment();
-    this._nddStore = await service.init(rpc.handle(this),
-        environment.nddSharedStore);
-    InspectorFrontendHost.sendMessageToBackend = this._sendMesage.bind(this);
-  }
-
-  nddStore() {
-    return this._nddStore;
+    return service.nddStore();
   }
 
   infoForTarget(target) {
@@ -226,9 +217,14 @@ Ndb.NodeProcessManager = class extends Common.Object {
     if (!this._servicePromise) {
       async function service() {
         const [info, backend] = await Promise.all([Ndb.environment(), Runtime.backendPromise]);
-        return backend.createService(info.serviceDir + '/ndd_service.js');
+        const service = await backend.createService(info.serviceDir + '/ndd_service.js');
+        const environment = await Ndb.environment();
+        await service.init(rpc.handle(this),
+            environment.nddSharedStore);
+        InspectorFrontendHost.sendMessageToBackend = this._sendMesage.bind(this);
+        return service;
       }
-      this._servicePromise = service();
+      this._servicePromise = service.call(this);
     }
     return this._servicePromise;
   }
