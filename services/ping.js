@@ -4,15 +4,18 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-module.exports = prepareProcess;
+const { rpc, rpc_process } = require('carlo/rpc');
 
-function prepareProcess(disposeCallback) {
-  process.on('uncaughtException', error => {
-    // mute carlo rpc errors
-    if (error.message === 'Channel closed')
-      return;
-    process.exit(1);
-  });
-  // dispose when child process is disconnected
-  process.on('disconnect', () => disposeCallback());
+class Handler {
+  constructor() {
+    require('../lib/process_utility.js')(() => this.dispose());
+  }
+
+  ping() {}
+
+  dispose() {
+    Promise.resolve().then(() => process.exit(0));
+  }
 }
+
+rpc_process.init(() => rpc.handle(new Handler()));

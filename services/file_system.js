@@ -7,7 +7,15 @@
 const { rpc, rpc_process } = require('carlo/rpc');
 const chokidar = require('chokidar');
 const fs = require('fs');
-const { URL } = require('url');
+const { URL, fileURLToPath } = require('url');
+
+function urlToPlatformPath(fileURL) {
+  if (fileURLToPath)
+    return fileURLToPath(fileURL);
+  if (process.platform === 'win32')
+    return fileURL.substr('file:///'.length).replace(/\//g, '\\');
+  return fileURL.substr('file://'.length);
+}
 
 class FileSystemHandler {
   constructor() {
@@ -39,7 +47,7 @@ class FileSystemHandler {
       try {
         const names = fs.readdirSync(url);
         const urlString = url.toString();
-        if (this._watcher) this._watcher.add(urlString);
+        if (this._watcher) this._watcher.add(urlToPlatformPath(urlString));
         names.forEach(name => {
           if (name === '.git') gitFolders.add(urlString.substr(fileURL.length + 1));
           const fileName = urlString + '/' + name;

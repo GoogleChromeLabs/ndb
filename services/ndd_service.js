@@ -189,7 +189,7 @@ class NddService {
   kill(id) {
     if (!this._running.has(id))
       return;
-    process.kill(id, 'SIGKILL');
+    process.kill(id, 'SIGINT');
     for (const nddStore of this._nddStores)
       fs.unlink(path.join(nddStore, id), _ => 0);
   }
