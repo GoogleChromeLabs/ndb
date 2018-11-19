@@ -13,13 +13,6 @@ Sources.SourcesPanel.instance()._showThreadsIfNeeded = function() {
   }
 };
 Sources.SourcesPanel.instance()._showThreadsIfNeeded();
-Ndb.NodeProcessManager.instance().then(instance => {
-  if (!Common.moduleSetting('autoStartMain').get())
-    return;
-  const main = Ndb.mainConfiguration();
-  if (main)
-    instance.debug(main.execPath, main.args);
-});
 
 UI.context.addFlavorChangeListener(SDK.DebuggerPausedDetails, _ => {
   const details = UI.context.flavor(SDK.DebuggerPausedDetails);
@@ -57,9 +50,10 @@ Ndb.NodeProcesses = class extends UI.VBox {
    * @param {!SDK.Target} target
    */
   async targetAdded(target) {
-    const processManager = await Ndb.NodeProcessManager.instance();
-    const processInfo = processManager.infoForTarget(target);
-    if (!processInfo || processInfo.isRepl())
+    if (target.id() === '<root>')
+      return;
+    const processInfo = Ndb.nodeProcessManager.infoForTarget(target);
+    if (!processInfo || processInfo.isRepl(await Ndb.environment()))
       return;
     const f = UI.Fragment.build`
       <div class=process-item>
@@ -82,9 +76,9 @@ Ndb.NodeProcesses = class extends UI.VBox {
 
     const buttons = f.$('controls-buttons');
     const toolbar = new UI.Toolbar('', buttons);
-    const runButton = new UI.ToolbarButton(Common.UIString('Kill'), 'largeicon-terminate-execution');
-    runButton.addEventListener(UI.ToolbarButton.Events.Click, _ => processManager.kill(target));
-    toolbar.appendToolbarItem(runButton);
+    const button = new UI.ToolbarButton(Common.UIString('Kill'), 'largeicon-terminate-execution');
+    button.addEventListener(UI.ToolbarButton.Events.Click, _ => Ndb.nodeProcessManager.kill(target));
+    toolbar.appendToolbarItem(button);
 
     const treeElement = new UI.TreeElement(f.element());
     treeElement.onselect = _ => {
