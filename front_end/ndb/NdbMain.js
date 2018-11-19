@@ -11,6 +11,12 @@ function callFrontend(f) {
     f();
 }
 
+Ndb.environment = function() {
+  if (!Ndb._environmentPromise)
+    Ndb._environmentPromise = getProcessInfo();
+  return Ndb._environmentPromise;
+};
+
 /**
  * @implements {Common.Runnable}
  */
@@ -21,7 +27,6 @@ Ndb.NdbMain = class extends Common.Object {
   async run() {
     InspectorFrontendAPI.setUseSoftMenu(true);
     document.title = 'ndb';
-    self.NdbProcessInfo = await getProcessInfo();
     Common.moduleSetting('blackboxInternalScripts').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
     Ndb.NdbMain._calculateBlackboxState();
 
@@ -29,20 +34,30 @@ Ndb.NdbMain = class extends Common.Object {
     setting.set([Ndb.NdbMain._defaultExcludePattern()].join('|'));
     Runtime.searchServicePromise.then(service => service.setExcludedPattern(setting.get()));
 
+    Ndb.nodeProcessManager = new Ndb.NodeProcessManager(SDK.targetManager);
+    await new Promise(resolve => SDK.initMainConnection(resolve));
     // Create root Main target.
-    const stubConnection = new SDK.StubConnection({onMessage: _ => 0, onDisconnect: _ => 0});
-    SDK.targetManager.createTarget('<root>', '', 0, _ => stubConnection, null, true);
+    SDK.targetManager.createTarget('<root>', ls`Root`, SDK.Target.Type.Browser, null);
+    await Ndb.nodeProcessManager.start();
+
     this._startRepl();
 
     Runtime.experiments.setEnabled('timelineTracingJSProfile', false);
-    const cwdUrl = Common.ParsedURL.platformPathToURL(NdbProcessInfo.cwd);
+    const environment = await Ndb.environment();
+    const cwdUrl = Common.ParsedURL.platformPathToURL(environment.cwd);
     const fileSystemManager = Persistence.isolatedFileSystemManager;
-    fileSystemManager.addPlatformFileSystem(cwdUrl, await Ndb.FileSystem.create(fileSystemManager, NdbProcessInfo.cwd, cwdUrl));
+    fileSystemManager.addPlatformFileSystem(cwdUrl, await Ndb.FileSystem.create(fileSystemManager, environment.cwd, cwdUrl));
+
+    if (Common.moduleSetting('autoStartMain').get()) {
+      const main = await Ndb.mainConfiguration();
+      if (main)
+        Ndb.nodeProcessManager.debug(main.execPath, main.args);
+    }
   }
 
   async _startRepl() {
-    const processManager = await Ndb.NodeProcessManager.instance();
-    processManager.debug(NdbProcessInfo.execPath, [NdbProcessInfo.repl])
+    const environment = await Ndb.environment();
+    Ndb.nodeProcessManager.debug(environment.execPath, [environment.repl])
         .then(this._startRepl.bind(this));
   }
 
@@ -77,8 +92,9 @@ Ndb.NdbMain = class extends Common.Object {
   }
 };
 
-Ndb.mainConfiguration = () => {
-  const cmd = NdbProcessInfo.argv.slice(2);
+Ndb.mainConfiguration = async() => {
+  const environment = await Ndb.environment();
+  const cmd = environment.argv.slice(2);
   if (cmd.length === 0 || cmd[0] === '.')
     return null;
   let execPath;
@@ -86,7 +102,7 @@ Ndb.mainConfiguration = () => {
   if (cmd[0].endsWith('.js')
     || cmd[0].endsWith('.mjs')
     || cmd[0].startsWith('-')) {
-    execPath = NdbProcessInfo.execPath;
+    execPath = environment.execPath;
     args = cmd;
   } else {
     execPath = cmd[0];
@@ -119,99 +135,106 @@ Ndb.ContextMenuProvider = class {
       return;
     contextMenu.debugSection().appendItem(ls`Run this script`, async() => {
       const platformPath = Common.ParsedURL.urlToPlatformPath(url, Host.isWin());
-      const processManager = await Ndb.NodeProcessManager.instance();
       const args = url.endsWith('.mjs') ? ['--experimental-modules', platformPath] : [platformPath];
-      processManager.debug(NdbProcessInfo.execPath, args);
+      const environment = await Ndb.environment();
+      Ndb.nodeProcessManager.debug(environment.execPath, args);
     });
   }
 };
 
 Ndb.NodeProcessManager = class extends Common.Object {
-  /**
-   * @return {!Promise<!Ndb.NodeProcessManager>}
-   */
-  static async instance() {
-    if (!Ndb.NodeProcessManager._instancePromise) {
-      Ndb.NodeProcessManager._instancePromise = new Promise(resolve => {
-        Ndb.NodeProcessManager._instanceReady = resolve;
-      });
-      Ndb.NodeProcessManager._create();
-    }
-    return Ndb.NodeProcessManager._instancePromise;
-  }
-
-  static async _create() {
-    const service = await (await Runtime.backendPromise).createService(
-        NdbProcessInfo.serviceDir + '/ndd_service.js');
-    const instance = new Ndb.NodeProcessManager(SDK.targetManager, service);
-    instance._nddStore = await service.init(
-        rpc.handle(instance),
-        NdbProcessInfo.nddSharedStore);
-    Ndb.NodeProcessManager._instanceReady(instance);
-    delete Ndb.NodeProcessManager._instanceReady;
-  }
-
-  constructor(targetManager, nddService) {
+  constructor(targetManager) {
     super();
-    this._targetManager = targetManager;
-
-    this._nddService = nddService;
-
+    this._servicePromise = null;
+    this._nddStore = null;
+    this._connection = null;
     this._processes = new Map();
-    this._connections = new Map();
-
     this._lastDebugId = 0;
     this._lastStarted = null;
-
+    this._targetManager = targetManager;
     this._targetManager.addModelListener(
         SDK.RuntimeModel, SDK.RuntimeModel.Events.ExecutionContextDestroyed, this._onExecutionContextDestroyed, this);
+  }
+
+  async start() {
+    const service = await this._service();
+    const environment = await Ndb.environment();
+    this._nddStore = await service.init(rpc.handle(this),
+        environment.nddSharedStore);
+    InspectorFrontendHost.sendMessageToBackend = this._sendMesage.bind(this);
   }
 
   nddStore() {
     return this._nddStore;
   }
 
-  _onNotification({data: {name, params}}) {
-    if (name === 'added')
-      this._onProcessAdded(params);
+  infoForTarget(target) {
+    return this._processes.get(target.id()) || null;
   }
 
-  detected(payload, connection) {
+  async detected(payload) {
     const pid = payload.id;
     const processInfo = new Ndb.ProcessInfo(payload);
     this._processes.set(pid, processInfo);
 
-    const parentTarget = payload.ppid ? this._targetManager.targetById(payload.ppid) : this._targetManager.mainTarget();
+    const parentTarget = (payload.ppid ? this._targetManager.targetById(payload.ppid) || this._targetManager.mainTarget() : this._targetManager.mainTarget());
     const target = this._targetManager.createTarget(
-        pid, processInfo.userFriendlyName(), SDK.Target.Capability.JS,
-        this._createConnection.bind(this, connection),
-        parentTarget, true);
-    if (this._shouldPauseAtStart(payload.argv)) {
+        pid, processInfo.userFriendlyName(), SDK.Target.Type.Node,
+        parentTarget, pid);
+    if (shouldPauseAtStart(await Ndb.environment(), payload.argv)) {
       target.runtimeAgent().invoke_evaluate({
         expression: `process.breakAtStart && process.breakAtStart()`,
         includeCommandLineAPI: true
       });
     }
-    return target.runtimeAgent().runIfWaitingForDebugger();
+    await target.runtimeAgent().runIfWaitingForDebugger();
+
+    function shouldPauseAtStart(environment, argv) {
+      if (!Common.moduleSetting('pauseAtStart').get())
+        return false;
+      const [_, arg] = argv;
+      if (arg && (arg === environment.repl ||
+          arg.endsWith('/bin/npm') || arg.endsWith('\\bin\\npm') ||
+          arg.endsWith('/bin/yarn') || arg.endsWith('\\bin\\yarn') ||
+          arg.endsWith('/bin/npm-cli.js') || arg.endsWith('\\bin\\npm-cli.js')))
+        return false;
+      return true;
+    }
   }
 
-  _createConnection(connection, params) {
-    return new Ndb.Connection(connection, params);
+  disconnected(sessionId) {
+    this._processes.delete(sessionId);
+    const target = this._targetManager.targetById(sessionId);
+    if (target)
+      this._targetManager.removeTarget(target);
   }
 
-  _shouldPauseAtStart(argv) {
-    if (!Common.moduleSetting('pauseAtStart').get())
-      return false;
-    const [_, arg] = argv;
-    if (arg && (arg === NdbProcessInfo.repl ||
-        arg.endsWith('/bin/npm') || arg.endsWith('\\bin\\npm') ||
-        arg.endsWith('/bin/yarn') || arg.endsWith('\\bin\\yarn') ||
-        arg.endsWith('/bin/npm-cli.js') || arg.endsWith('\\bin\\npm-cli.js')))
-      return false;
-    return true;
+  dispatchMessage(message) {
+    if (this._processes.has(message.sessionId)) {
+      InspectorFrontendHost.events.dispatchEventToListeners(
+          InspectorFrontendHostAPI.Events.DispatchMessage,
+          message);
+    }
   }
 
-  async _onExecutionContextDestroyed({data: executionContext}) {
+  async _sendMesage(message) {
+    const service = await this._service();
+    return service.sendMessage(message);
+  }
+
+  _service() {
+    if (!this._servicePromise) {
+      async function service() {
+        const [info, backend] = await Promise.all([Ndb.environment(), Runtime.backendPromise]);
+        return backend.createService(info.serviceDir + '/ndd_service.js');
+      }
+      this._servicePromise = service();
+    }
+    return this._servicePromise;
+  }
+
+  async _onExecutionContextDestroyed(event) {
+    const executionContext = event.data;
     const mainContextId = 1;
     if (executionContext.id !== mainContextId)
       return;
@@ -221,26 +244,26 @@ Ndb.NodeProcessManager = class extends Common.Object {
       await new Promise(resolve => debuggerModel.addEventListener(
           SDK.DebuggerModel.Events.DebuggerWasEnabled, resolve));
     }
-    target._connection.disconnect();
+    const service = await this._service();
+    service.disconnect(target.id());
   }
 
-  infoForTarget(target) {
-    return this._processes.get(target.id()) || null;
-  }
-
-  debug(execPath, args) {
+  async debug(execPath, args) {
+    const service = await this._service();
     const debugId = String(++this._lastDebugId);
     this._lastStarted = {execPath, args, debugId};
-    return this._nddService.debug(
+    const environment = await Ndb.environment();
+    return service.debug(
         execPath, args, {
           data: debugId,
-          cwd: NdbProcessInfo.cwd,
-          preload: NdbProcessInfo.preload
+          cwd: environment.cwd,
+          preload: environment.preload
         });
   }
 
-  kill(target) {
-    return this._nddService.kill(target.id());
+  async kill(target) {
+    const service = await this._service();
+    return service.kill(target.id());
   }
 
   async restartLast() {
@@ -256,7 +279,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
     }
     await Promise.all(promises);
     const {execPath, args} = this._lastStarted;
-    this.debug(execPath, args);
+    await this.debug(execPath, args);
   }
 };
 
@@ -319,9 +342,9 @@ Ndb.ProcessInfo = class {
     }).join(' ');
   }
 
-  isRepl() {
-    return this._argv.length === 2 && this._argv[0] === NdbProcessInfo.execPath &&
-        this._argv[1] === NdbProcessInfo.repl;
+  isRepl(environment) {
+    return this._argv.length === 2 && this._argv[0] === environment.execPath &&
+        this._argv[1] === environment.repl;
   }
 };
 
@@ -339,7 +362,7 @@ Ndb.RestartActionDelegate = class {
   handleAction(context, actionId) {
     switch (actionId) {
       case 'ndb.restart':
-        Ndb.NodeProcessManager.instance().then(manager => manager.restartLast());
+        Ndb.nodeProcessManager.restartLast();
         return true;
     }
     return false;
@@ -403,7 +426,7 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
 (async function() {
   if (!Runtime.queryParam('debugFrontend'))
     return;
-  const [info, backend] = await Promise.all([getProcessInfo(), Runtime.backendPromise]);
+  const [info, backend] = await Promise.all([Ndb.environment(), Runtime.backendPromise]);
   const service = await backend.createService(info.serviceDir + '/ping.js');
   checkBackend();
 

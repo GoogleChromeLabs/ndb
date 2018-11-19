@@ -21,51 +21,6 @@ const fsMkdtemp = util.promisify(fs.mkdtemp);
 const fsReadFile = util.promisify(fs.readFile);
 const removeFolder = util.promisify(require('rimraf'));
 
-class Connection {
-  constructor(ws) {
-    this._ws = ws;
-    this._ws.on('error', this._error.bind(this));
-    this._ws.on('message', this._message.bind(this));
-    this._ws.once('close', this._close.bind(this));
-    this._buffer = [];
-  }
-
-  _error() {}
-
-  /**
-   * @param {string} message
-   */
-  _message(message) {
-    if (this._client)
-      this._client.messageReceived(message);
-    else
-      this._buffer.push(this._message.bind(this, message));
-  }
-
-  _close() {
-    if (this._client)
-      this._client.closed();
-    else
-      this._buffer.push(this._close.bind(this));
-  }
-
-  setClient(client) {
-    this._client = client;
-    this._buffer.splice(0).forEach(action => action());
-  }
-
-  /**
-   * @param {string} message
-   */
-  send(message) {
-    return new Promise(resolve => this._ws.send(message, resolve));
-  }
-
-  disconnect() {
-    this._ws.close();
-  }
-}
-
 class NddService {
   constructor() {
     this._nddStores = [];
@@ -110,8 +65,20 @@ class NddService {
         webSocketDebuggerUrl = url.format(wsUrl);
       }
       const ws = new WebSocket(webSocketDebuggerUrl);
-      const conn = new Connection(ws);
-      ws.once('open', () => this._frontend.detected({...info, id}, rpc.handle(conn)));
+      ws.once('open', () => {
+        this._sockets.set(id, ws);
+        this._frontend.detected({...info, id}, rpc.handle(this));
+      });
+      ws.on('message', rawMessage => {
+        const message = JSON.parse(rawMessage);
+        message.sessionId = id;
+        this._frontend.dispatchMessage(message);
+      });
+      ws.once('close', () => {
+        this._sockets.delete(id);
+        this._frontend.disconnected(id);
+      });
+      ws.once('error', () => 0);
     } catch (e) {
     }
   }
@@ -143,6 +110,8 @@ class NddService {
       for (const id of this._running)
         process.kill(id, 'SIGKILL');
       this._running.clear();
+      for (const ws of this._sockets.values())
+        ws.close();
       for (const watcher of this._nddStoreWatchers)
         watcher.close();
       await removeFolder(this._nddStores[0]);
@@ -192,6 +161,20 @@ class NddService {
     process.kill(id, 'SIGINT');
     for (const nddStore of this._nddStores)
       fs.unlink(path.join(nddStore, id), _ => 0);
+  }
+
+  sendMessage(rawMessage) {
+    const message = JSON.parse(rawMessage);
+    const socket = this._sockets.get(message.sessionId);
+    delete message.sessionId;
+    if (socket)
+      socket.send(JSON.stringify(message));
+  }
+
+  disconnect(sessionId) {
+    const socket = this._sockets.get(sessionId);
+    if (socket)
+      socket.close();
   }
 }
 

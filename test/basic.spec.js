@@ -317,7 +317,7 @@ async function setupHelpers(frontend) {
         if (msg.messageText === text)
           resolve();
       }, true))
-        , text);
+    , text);
   };
 
   frontend.nodeProcess = function() {
@@ -343,6 +343,6 @@ async function setupHelpers(frontend) {
       new Promise(resolve =>  Ndb.NodeProcessManager.instance().then(manager => {
         manager.addEventListener(Ndb.NodeProcessManager.Events.Finished, _ => !--num && resolve());
       }))
-        , num);
+    , num);
   };
 }
