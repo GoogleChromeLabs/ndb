@@ -26,7 +26,7 @@ class FileSystemHandler {
    * @param {string} fileURL
    * @param {string} excludePattern
    */
-  filePaths(fileURL, excludePattern) {
+  async filePaths(fileURL, excludePattern) {
     let excludeRegex = null;
     try {
       excludeRegex = new RegExp(excludePattern);
@@ -40,25 +40,29 @@ class FileSystemHandler {
     const excludedFolders = new Set();
 
     while (queue.length) {
+      // Get a chance to terminate process if needed.
+      if (visited.size % 5000 === 0)
+        await new Promise(resolve => setTimeout(resolve, 0));
       const url = queue.shift();
-      if (visited.has(url)) continue;
-      visited.add(url);
 
-      try {
+      const stat = fs.lstatSync(url);
+      const realPath = stat.isSymbolicLink() ? fs.realpathSync(url) : urlToPlatformPath(url.toString());
+      if (visited.has(realPath)) continue;
+      visited.add(realPath);
+
+      if (stat.isDirectory()) {
         const names = fs.readdirSync(url);
         const urlString = url.toString();
-        if (this._watcher) this._watcher.add(urlToPlatformPath(urlString));
+        if (this._watcher) this._watcher.add(realPath);
         names.forEach(name => {
           if (name === '.git') gitFolders.add(urlString.substr(fileURL.length + 1));
           const fileName = urlString + '/' + name;
-          if (excludeRegex && excludeRegex.test(fileName.substr(fileURL.length)))
+          if (excludeRegex && excludeRegex.test(fileName.substr(fileURL.length) + '/'))
             excludedFolders.add(fileName.substr(fileURL.length + 1));
           else
             queue.push(new URL(fileName));
         });
-      } catch (e) {
-        if (e.code !== 'ENOTDIR')
-          throw e;
+      } else if (stat.isFile()) {
         const urlString = url.toString();
         if (excludeRegex && excludeRegex.test(urlString)) continue;
         filePaths.add(urlString.substr(fileURL.length + 1));
