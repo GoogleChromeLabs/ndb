@@ -31,7 +31,7 @@ Ndb.NdbMain = class extends Common.Object {
     Ndb.NdbMain._calculateBlackboxState();
 
     const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
-    setting.set([Ndb.NdbMain._defaultExcludePattern()].join('|'));
+    setting.set(Ndb.NdbMain._defaultExcludePattern().join('|'));
     Runtime.searchServicePromise.then(service => service.setExcludedPattern(setting.get()));
 
     Ndb.nodeProcessManager = new Ndb.NodeProcessManager(SDK.targetManager);
