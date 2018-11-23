@@ -17,6 +17,12 @@ Ndb.environment = function() {
   return Ndb._environmentPromise;
 };
 
+Ndb.nodeExecPath = function() {
+  if (!Ndb._nodeExecPathPromise)
+    Ndb._nodeExecPathPromise = Ndb.backend.which('node').then(result => result.resolvedPath);
+  return Ndb._nodeExecPathPromise;
+};
+
 /**
  * @implements {Common.Runnable}
  */
@@ -27,6 +33,7 @@ Ndb.NdbMain = class extends Common.Object {
   async run() {
     InspectorFrontendAPI.setUseSoftMenu(true);
     document.title = 'ndb';
+    Ndb.backend = await Runtime.backendPromise;
     Common.moduleSetting('blackboxInternalScripts').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
     Ndb.NdbMain._calculateBlackboxState();
 
@@ -50,13 +57,15 @@ Ndb.NdbMain = class extends Common.Object {
     if (Common.moduleSetting('autoStartMain').get()) {
       const main = await Ndb.mainConfiguration();
       if (main)
-        Ndb.nodeProcessManager.debug(main.execPath, main.args);
+        Ndb.nodeProcessManager.debug(await Ndb.nodeExecPath(), main.args);
     }
+
+    startWatchdog();
   }
 
   async _startRepl() {
     const environment = await Ndb.environment();
-    Ndb.nodeProcessManager.debug(environment.execPath, [environment.repl])
+    Ndb.nodeProcessManager.debug(await Ndb.nodeExecPath(), [environment.repl])
         .then(this._startRepl.bind(this));
   }
 
@@ -101,7 +110,7 @@ Ndb.mainConfiguration = async() => {
   if (cmd[0].endsWith('.js')
     || cmd[0].endsWith('.mjs')
     || cmd[0].startsWith('-')) {
-    execPath = environment.execPath;
+    execPath = await Ndb.nodeExecPath();
     args = cmd;
   } else {
     execPath = cmd[0];
@@ -135,8 +144,7 @@ Ndb.ContextMenuProvider = class {
     contextMenu.debugSection().appendItem(ls`Run this script`, async() => {
       const platformPath = Common.ParsedURL.urlToPlatformPath(url, Host.isWin());
       const args = url.endsWith('.mjs') ? ['--experimental-modules', platformPath] : [platformPath];
-      const environment = await Ndb.environment();
-      Ndb.nodeProcessManager.debug(environment.execPath, args);
+      Ndb.nodeProcessManager.debug(await Ndb.nodeExecPath(), args);
     });
   }
 };
@@ -338,8 +346,7 @@ Ndb.ProcessInfo = class {
   }
 
   isRepl(environment) {
-    return this._argv.length === 2 && this._argv[0] === environment.execPath &&
-        this._argv[1] === environment.repl;
+    return this._argv.length === 2 && this._argv[1] === environment.repl;
   }
 };
 
@@ -418,7 +425,7 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
   }
 };
 
-(async function() {
+async function startWatchdog() {
   if (!Runtime.queryParam('debugFrontend'))
     return;
   const service = await Ndb.backend.createService('ping.js');
@@ -431,4 +438,4 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
       setTimeout(checkBackend, 3000);
     });
   }
-})();
+}
