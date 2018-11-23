@@ -21,7 +21,7 @@
   "author": "The Chromium Authors",
   "license": "Apache-2.0",
   "dependencies": {
-    "carlo": "^0.9.26",
+    "carlo": "^0.9.29",
     "chokidar": "^2.0.4",
     "fs-copy-file-sync": "^1.1.1",
     "isbinaryfile": "^3.0.3",

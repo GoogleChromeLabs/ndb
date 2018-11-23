@@ -53,10 +53,8 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    * @return {!Promise}
    */
   async _service() {
-    if (!this._servicePromise) {
-      const [info, backend] = await Promise.all([Ndb.environment(), Runtime.backendPromise]);
-      this._servicePromise = backend.createService(info.serviceDir + '/file_system.js');
-    }
+    if (!this._servicePromise)
+      this._servicePromise = Ndb.backend.createService('file_system.js');
     return this._servicePromise;
   }
 
