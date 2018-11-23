@@ -88,7 +88,7 @@ class InspectorFrontendHost {
    * @param {text} url
    */
   openInNewTab(url) {
-    opn.openInNewTab(url);
+    opn(url);
   }
 
   getPreferences() {
