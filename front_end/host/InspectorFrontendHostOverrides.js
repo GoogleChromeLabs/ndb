@@ -26,50 +26,6 @@
   InspectorFrontendHost.clearPreferences = () => servicePromise.then(service => service.clearPreferences());
   InspectorFrontendHost.bringToFront = () => Runtime.backendPromise.then(backend => backend.bringToFront());
 
-  class SearchClient {
-    /**
-     * @param {number} requestId
-     * @param {string} fileSystemPath
-     * @param {number} totalWork
-     */
-    indexingTotalWorkCalculated(requestId, fileSystemPath, totalWork) {
-      callFrontend(() => InspectorFrontendAPI.indexingTotalWorkCalculated(requestId, fileSystemPath, totalWork));
-    }
-
-    /**
-     * @param {number} requestId
-     * @param {string} fileSystemPath
-     * @param {number} worked
-     */
-    indexingWorked(requestId, fileSystemPath, worked) {
-      callFrontend(() => InspectorFrontendAPI.indexingWorked(requestId, fileSystemPath, worked));
-    }
-
-    /**
-     * @param {number} requestId
-     * @param {string} fileSystemPath
-     */
-    indexingDone(requestId, fileSystemPath) {
-      callFrontend(_ => InspectorFrontendAPI.indexingDone(requestId, fileSystemPath));
-    }
-
-    /**
-     * @param {number} requestId
-     * @param {string} fileSystemPath
-     * @param {!Array.<string>} files
-     */
-    searchCompleted(requestId, fileSystemPath, files) {
-      callFrontend(_ => InspectorFrontendAPI.searchCompleted(requestId, fileSystemPath, files));
-    }
-  }
-
-  Runtime.searchServicePromise =
-    Runtime.backendPromise.then(backend => backend.createService('search.js', rpc.handle(new SearchClient())));
-
-  InspectorFrontendHost.indexPath = (...args) => Runtime.searchServicePromise.then(search => search.indexPath(...args));
-  InspectorFrontendHost.stopIndexing = (...args) => Runtime.searchServicePromise.then(search => search.stopIndexing(...args));
-  InspectorFrontendHost.searchInPath = (...args) => Runtime.searchServicePromise.then(search => search.searchInPath(...args));
-
   Common.Settings.prototype._storageFromType = function(storageType) {
     switch (storageType) {
       case (Common.SettingStorageType.Local):

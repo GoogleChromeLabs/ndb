@@ -4,13 +4,6 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-function callFrontend(f) {
-  if (Runtime.queryParam('debugFrontend'))
-    setTimeout(f, 0);
-  else
-    f();
-}
-
 Ndb.environment = function() {
   if (!Ndb._environmentPromise)
     Ndb._environmentPromise = getProcessInfo();
@@ -39,7 +32,6 @@ Ndb.NdbMain = class extends Common.Object {
 
     const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
     setting.set(Ndb.NdbMain._defaultExcludePattern().join('|'));
-    Runtime.searchServicePromise.then(service => service.setExcludedPattern(setting.get()));
 
     Ndb.nodeProcessManager = new Ndb.NodeProcessManager(SDK.targetManager);
     await new Promise(resolve => SDK.initMainConnection(resolve));

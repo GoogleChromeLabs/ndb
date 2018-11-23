@@ -23,19 +23,15 @@ class SearchBackend {
     this._indexToFileName = new Map();
     this._fileNameToIndex = new Map();
 
-    this._excludeRegex = null;
     require('../lib/process_utility.js')(() => this.dispose());
-  }
-
-  setExcludedPattern(pattern) {
-    this._excludeRegex = new RegExp(pattern);
   }
 
   /**
    * @param {number} requestId
    * @param {string} fileSystemPath
    */
-  async indexPath(requestId, fileSystemPath) {
+  async indexPath(requestId, fileSystemPath, excludedPattern) {
+    const excludeRegex = new RegExp(excludedPattern);
     if (this._index.has(fileSystemPath)) {
       this._indexChangedFiles(requestId, fileSystemPath);
       return;
@@ -60,7 +56,9 @@ class SearchBackend {
             done();
             return;
           }
-          if (this._excludeRegex && this._excludeRegex.test(path.relative(fileSystemPath, file).replace(/\\/g, '/'))) {
+          const relativeName = path.relative(fileSystemPath, file);
+          const testName = `/${relativeName}${stats.isDirectory() ? '/' : ''}`.replace(/\\/g, '/');
+          if (excludeRegex && excludeRegex.test(testName)) {
             done();
             return;
           }
