@@ -26,7 +26,6 @@ Ndb.NdbMain = class extends Common.Object {
   async run() {
     InspectorFrontendAPI.setUseSoftMenu(true);
     document.title = 'ndb';
-    Ndb.backend = await Runtime.backendPromise;
     Common.moduleSetting('blackboxInternalScripts').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
     Ndb.NdbMain._calculateBlackboxState();
 

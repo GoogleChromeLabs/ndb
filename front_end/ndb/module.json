@@ -54,6 +54,7 @@
     ],
     "dependencies": ["common", "sdk", "bindings", "persistence", "components"],
     "scripts": [
+        "InspectorFrontendHostOverrides.js",
         "FileSystem.js",
         "NdbMain.js"
     ]
