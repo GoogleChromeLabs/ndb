@@ -216,4 +216,4 @@ class SearchBackend {
   }
 }
 
-rpc_process.init(args => rpc.handle(new SearchBackend(args.args[0])));
+rpc_process.init(frontend => rpc.handle(new SearchBackend(frontend)));

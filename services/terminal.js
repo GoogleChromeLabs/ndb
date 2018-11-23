@@ -54,4 +54,4 @@ function init(frontend, nddStore, preload, cols, rows) {
   }
 }
 
-rpc_process.init(args => init(...args.args));
+rpc_process.init(init);

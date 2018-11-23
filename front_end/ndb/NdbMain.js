@@ -216,8 +216,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
   _service() {
     if (!this._servicePromise) {
       async function service() {
-        const [info, backend] = await Promise.all([Ndb.environment(), Runtime.backendPromise]);
-        const service = await backend.createService(info.serviceDir + '/ndd_service.js');
+        const service = await Ndb.backend.createService('ndd_service.js');
         const environment = await Ndb.environment();
         await service.init(rpc.handle(this),
             environment.nddSharedStore);
@@ -407,7 +406,7 @@ Bindings.CompilerScriptMapping.prototype._sourceMapDetached = function(event) {
  * @this {SDK.TextSourceMap}
  */
 SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
-  const {payload, error} = await (await Runtime.backendPromise).loadSourceMap(sourceMapURL, compiledURL);
+  const {payload, error} = await Ndb.backend.loadSourceMap(sourceMapURL, compiledURL);
   if (error || !payload)
     return null;
   try {
@@ -422,8 +421,7 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
 (async function() {
   if (!Runtime.queryParam('debugFrontend'))
     return;
-  const [info, backend] = await Promise.all([Ndb.environment(), Runtime.backendPromise]);
-  const service = await backend.createService(info.serviceDir + '/ping.js');
+  const service = await Ndb.backend.createService('ping.js');
   checkBackend();
 
   async function checkBackend() {

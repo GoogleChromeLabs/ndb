@@ -112,4 +112,4 @@ class InspectorFrontendHost {
   }
 }
 
-rpc_process.init(args => rpc.handle(new InspectorFrontendHost(args.args[0])));
+rpc_process.init(configDir => rpc.handle(new InspectorFrontendHost(configDir)));

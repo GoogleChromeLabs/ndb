@@ -10,7 +10,7 @@
     resolve(backend);
   });
   const servicePromise = getProcessInfo().then(info =>
-    Runtime.backendPromise.then(backend => backend.createService(info.serviceDir + '/inspector_frontend_host.js', info.configDir)));
+    Runtime.backendPromise.then(backend => backend.createService('inspector_frontend_host.js', info.configDir)));
 
   InspectorFrontendHost.isHostedMode = _ => false;
   InspectorFrontendHost.copyText = text => navigator.clipboard.writeText(text);
@@ -63,8 +63,8 @@
     }
   }
 
-  Runtime.searchServicePromise = getProcessInfo().then(info =>
-    Runtime.backendPromise.then(backend => backend.createService(info.serviceDir + '/search.js', rpc.handle(new SearchClient()))));
+  Runtime.searchServicePromise =
+    Runtime.backendPromise.then(backend => backend.createService('search.js', rpc.handle(new SearchClient())));
 
   InspectorFrontendHost.indexPath = (...args) => Runtime.searchServicePromise.then(search => search.indexPath(...args));
   InspectorFrontendHost.stopIndexing = (...args) => Runtime.searchServicePromise.then(search => search.stopIndexing(...args));
