@@ -71,7 +71,7 @@ module.exports = {
         "no-unsafe-negation": 2,
         "radix": 2,
         "valid-typeof": 2,
-        "no-unused-vars": [2, { "args": "none", "vars": "local", "varsIgnorePattern": "(_|load)" }],
+        "no-unused-vars": [2, { "args": "none", "vars": "local", "varsIgnorePattern": "(_|carloRpcWorldParams|load)" }],
         "no-implicit-globals": [2],
 
         // es2015 features

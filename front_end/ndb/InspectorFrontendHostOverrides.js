@@ -5,26 +5,25 @@
  */
 
 (function(){
-  Runtime.backendPromise = Runtime.backendPromise || new Promise(resolve => self.load = backend => {
-    delete self.load;
-    resolve(backend);
-  });
-  const servicePromise = getProcessInfo().then(info =>
-    Runtime.backendPromise.then(backend => backend.createService('inspector_frontend_host.js', info.configDir)));
+  let hostBackend;
 
-  InspectorFrontendHost.isHostedMode = _ => false;
-  InspectorFrontendHost.copyText = text => navigator.clipboard.writeText(text);
-  InspectorFrontendHost.openInNewTab = url => servicePromise.then(service => service.openInNewTab(url));
-  InspectorFrontendHost.getPreferences = f => {
+  InspectorFrontendHost.getPreferences = async function(callback) {
     const threads = runtime._extensions.find(e => e._descriptor.className === 'Sources.ThreadsSidebarPane');
     threads._descriptor.className = 'UI.Widget';
     threads._descriptor.title = 'Node processes';
-    servicePromise.then(service => service.getPreferences().then(f));
+    Ndb.backend = await carloRpcWorldParams;
+    const info = await getProcessInfo();
+    hostBackend = await Ndb.backend.createService('inspector_frontend_host.js', info.configDir);
+    callback(await hostBackend.getPreferences());
   };
-  InspectorFrontendHost.setPreference = (name, value) => servicePromise.then(service => service.setPreference(name, value));
-  InspectorFrontendHost.removePreference = name => servicePromise.then(service => service.removePreference(name));
-  InspectorFrontendHost.clearPreferences = () => servicePromise.then(service => service.clearPreferences());
-  InspectorFrontendHost.bringToFront = () => Runtime.backendPromise.then(backend => backend.bringToFront());
+
+  InspectorFrontendHost.isHostedMode = _ => false;
+  InspectorFrontendHost.copyText = text => navigator.clipboard.writeText(text);
+  InspectorFrontendHost.openInNewTab = url => hostBackend.openInNewTab(url);
+  InspectorFrontendHost.setPreference = (name, value) => hostBackend.setPreference(name, value);
+  InspectorFrontendHost.removePreference = name => hostBackend.removePreference(name);
+  InspectorFrontendHost.clearPreferences = () => hostBackend.clearPreferences();
+  InspectorFrontendHost.bringToFront = () => Ndb.backend.bringToFront();
 
   Common.Settings.prototype._storageFromType = function(storageType) {
     switch (storageType) {
