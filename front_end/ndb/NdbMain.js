@@ -180,6 +180,8 @@ Ndb.NodeProcessManager = class extends Common.Object {
     await target.runtimeAgent().runIfWaitingForDebugger();
 
     function shouldPauseAtStart(environment, argv) {
+      if (argv.find(arg => arg.endsWith('ndb/inspect-brk')))
+        return true;
       if (!Common.moduleSetting('pauseAtStart').get())
         return false;
       const [_, arg] = argv;

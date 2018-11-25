@@ -17,6 +17,9 @@ if (!fs.existsSync(nddStoreDir))
 
 process.env.NDD_STORE = nddStoreDir;
 process.env.NDD_WAIT_FOR_CONNECTION = 0;
-process.env.NODE_OPTIONS = (process.env.NODE_OPTIONS || '') + ' -r ndb/inspect';
+let options = process.env.NODE_OPTIONS || '';
+if (!options.includes('ndb/inspect'))
+  options += ' -r ndb/inspect';
+process.env.NODE_OPTIONS = options;
 
 require('./lib/preload.js');
