@@ -68,7 +68,7 @@ footer
     - `test` - changes to ndb tests infrastructure.
     - `style` - ndb code style: spaces/alignment/wrapping etc.
     - `chore` - build-related work.
-2. *namespace* is put in parenthesis after label and is optional.
+2. *namespace* is put in parenthesis after label and is **optional**.
 3. *title* is a brief summary of changes.
 4. *description* is **optional**, new-line separated from title and is in present tense.
 5. *footer* is **optional**, new-line separated from *description* and contains "fixes" / "references" attribution to github issues.
