@@ -31,8 +31,9 @@ Ndb.NdbMain = class extends Common.Object {
 
     const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
     setting.set(Ndb.NdbMain._defaultExcludePattern().join('|'));
-
     Ndb.nodeProcessManager = new Ndb.NodeProcessManager(SDK.targetManager);
+    this._addDefaultFileSystem();
+
     await new Promise(resolve => SDK.initMainConnection(resolve));
     // Create root Main target.
     SDK.targetManager.createTarget('<root>', ls`Root`, SDK.Target.Type.Browser, null);
@@ -40,11 +41,6 @@ Ndb.NdbMain = class extends Common.Object {
     this._startRepl();
 
     Runtime.experiments.setEnabled('timelineTracingJSProfile', false);
-    const environment = await Ndb.environment();
-    const cwdUrl = Common.ParsedURL.platformPathToURL(environment.cwd);
-    const fileSystemManager = Persistence.isolatedFileSystemManager;
-    fileSystemManager.addPlatformFileSystem(cwdUrl, await Ndb.FileSystem.create(fileSystemManager, environment.cwd, cwdUrl));
-
     if (Common.moduleSetting('autoStartMain').get()) {
       const main = await Ndb.mainConfiguration();
       if (main)
@@ -52,6 +48,11 @@ Ndb.NdbMain = class extends Common.Object {
     }
 
     startWatchdog();
+  }
+
+  async _addDefaultFileSystem() {
+    const environment = await Ndb.environment();
+    await Ndb.nodeProcessManager.addFileSystem(environment.cwd);
   }
 
   async _startRepl() {
@@ -149,6 +150,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
     this._lastDebugId = 0;
     this._lastStarted = null;
     this._targetManager = targetManager;
+    this._cwds = new Set();
     this._targetManager.addModelListener(
         SDK.RuntimeModel, SDK.RuntimeModel.Events.ExecutionContextDestroyed, this._onExecutionContextDestroyed, this);
   }
@@ -162,11 +164,21 @@ Ndb.NodeProcessManager = class extends Common.Object {
     return this._processes.get(target.id()) || null;
   }
 
+  async addFileSystem(cwd) {
+    if (this._cwds.has(cwd))
+      return;
+    this._cwds.add(cwd);
+    const cwdUrl = Common.ParsedURL.platformPathToURL(cwd);
+    const fileSystemManager = Persistence.isolatedFileSystemManager;
+    fileSystemManager.addPlatformFileSystem(cwdUrl, await Ndb.FileSystem.create(fileSystemManager, cwd, cwdUrl));
+  }
+
   async detected(payload) {
     const pid = payload.id;
     const processInfo = new Ndb.ProcessInfo(payload);
     this._processes.set(pid, processInfo);
 
+    this.addFileSystem(processInfo.cwd());
     const parentTarget = (payload.ppid ? this._targetManager.targetById(payload.ppid) || this._targetManager.mainTarget() : this._targetManager.mainTarget());
     const target = this._targetManager.createTarget(
         pid, processInfo.userFriendlyName(), SDK.Target.Type.Node,
@@ -317,6 +329,7 @@ Ndb.Connection = class {
 Ndb.ProcessInfo = class {
   constructor(payload) {
     this._argv = payload.argv;
+    this._cwd = payload.cwd;
     this._data = payload.data;
   }
 
@@ -326,6 +339,10 @@ Ndb.ProcessInfo = class {
 
   data() {
     return this._data;
+  }
+
+  cwd() {
+    return this._cwd;
   }
 
   userFriendlyName() {
