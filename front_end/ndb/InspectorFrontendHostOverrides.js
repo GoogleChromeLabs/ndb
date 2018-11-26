@@ -8,9 +8,6 @@
   let hostBackend;
 
   InspectorFrontendHost.getPreferences = async function(callback) {
-    const threads = runtime._extensions.find(e => e._descriptor.className === 'Sources.ThreadsSidebarPane');
-    threads._descriptor.className = 'UI.Widget';
-    threads._descriptor.title = 'Node processes';
     [Ndb.backend] = await carlo.loadParams();
     const info = await getProcessInfo();
     hostBackend = await Ndb.backend.createService('inspector_frontend_host.js', info.configDir);
