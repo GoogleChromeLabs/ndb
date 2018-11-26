@@ -16,7 +16,8 @@
     "prepare": "node build.js",
     "dummyScriptForTest": "node -e 'console.log(239)'",
     "unit": "./node_modules/mocha/bin/mocha test/test.js",
-    "integration": "node test/integration.js"
+    "integration": "node test/integration.js",
+    "debug": "node debug.js"
   },
   "author": "The Chromium Authors",
   "license": "Apache-2.0",

@@ -140,7 +140,7 @@ class FileSystemHandler {
       ignoreInitial: true,
       awaitWriteFinish: {
         stabilityThreshold: 500,
-        pollInterval: 100
+        pollInterval: 500
       },
       depth: 0,
       ignorePermissionErrors: true
