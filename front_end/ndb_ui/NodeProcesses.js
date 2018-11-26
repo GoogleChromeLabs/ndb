@@ -4,16 +4,6 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-Sources.ThreadsSidebarPane.shouldBeShown = () => false;
-Sources.SourcesPanel.instance()._showThreadsIfNeeded = function() {
-  this._threadsSidebarPane = /** @type {!UI.View} */ (UI.viewManager.view('ndb.runningProcesses'));
-  if (this._sidebarPaneStack) {
-    this._sidebarPaneStack.showView(
-        this._threadsSidebarPane, this._splitWidget.isVertical() ? this._watchSidebarPane : this._callstackPane);
-  }
-};
-Sources.SourcesPanel.instance()._showThreadsIfNeeded();
-
 UI.context.addFlavorChangeListener(SDK.DebuggerPausedDetails, _ => {
   const details = UI.context.flavor(SDK.DebuggerPausedDetails);
   if (!details)
