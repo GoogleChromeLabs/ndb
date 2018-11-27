@@ -145,6 +145,7 @@ class FileSystemHandler {
       depth: 0,
       ignorePermissionErrors: true
     });
+    watcher.on('error', error => 0);
     const SUBSCRIPTION = new Set(['add', 'change', 'unlink']);
     const events = [];
     let timer = null;

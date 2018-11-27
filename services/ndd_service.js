@@ -6,7 +6,6 @@
 
 const { rpc, rpc_process } = require('carlo/rpc');
 const { spawn } = require('child_process');
-const chokidar = require('chokidar');
 const fs = require('fs');
 const http = require('http');
 const os = require('os');
@@ -38,17 +37,17 @@ class NddService {
       this._nddStores.push(nddSharedStore);
     this._nddStoreWatchers = [];
     for (const nddStore of this._nddStores) {
-      const watcher = chokidar.watch(nddStore, {
-        awaitWriteFinish: {
-          stabilityThreshold: 500,
-          pollInterval: 100
-        },
-        cwd: nddStore,
-        depth: 0
+      const watcher = fs.watch(nddStore, {
+        persistent: false,
+        recursive: false,
+        encoding: 'utf8'
+      }, (eventType, id) => {
+        if (id && eventType === 'change')
+          this._onAdded(nddStore, id);
+        else if (id && eventType === 'rename' && this._running.has(id))
+          this._running.delete(id);
       });
       this._nddStoreWatchers.push(watcher);
-      watcher.on('add', this._onAdded.bind(this, nddStore));
-      watcher.on('unlink', id => this._running.delete(id));
     }
   }
 
