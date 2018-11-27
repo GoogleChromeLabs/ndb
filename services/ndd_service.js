@@ -6,6 +6,7 @@
 
 const { rpc, rpc_process } = require('carlo/rpc');
 const { spawn } = require('child_process');
+const chokidar = require('chokidar');
 const fs = require('fs');
 const http = require('http');
 const os = require('os');
@@ -37,17 +38,21 @@ class NddService {
       this._nddStores.push(nddSharedStore);
     this._nddStoreWatchers = [];
     for (const nddStore of this._nddStores) {
-      const watcher = fs.watch(nddStore, {
-        persistent: false,
-        recursive: false,
-        encoding: 'utf8'
-      }, (eventType, id) => {
-        if (id && eventType === 'change')
-          this._onAdded(nddStore, id);
-        else if (id && eventType === 'rename' && this._running.has(id))
-          this._running.delete(id);
+      const watcher = chokidar.watch(nddStore, {
+        awaitWriteFinish: {
+          stabilityThreshold: 100,
+          pollInterval: 100
+        },
+        cwd: nddStore,
+        depth: 0
       });
       this._nddStoreWatchers.push(watcher);
+      watcher.on('add', id => {
+        this._running.add(id);
+        this._onAdded(nddStore, id);
+      });
+      watcher.on('unlink', id => this._running.delete(id));
+      watcher.on('error', error => 0);
     }
   }
 
@@ -56,7 +61,6 @@ class NddService {
   }
 
   async _onAdded(nddStore, id) {
-    this._running.add(id);
     try {
       const info = JSON.parse(await fsReadFile(path.join(nddStore, id), 'utf8'));
       const targetInfo = (await this._fetch(info.targetListUrl))[0];
@@ -109,8 +113,12 @@ class NddService {
 
   async dispose() {
     try {
-      for (const id of this._running)
-        process.kill(id, 'SIGKILL');
+      for (const id of Array.from(this._running)) {
+        try {
+          process.kill(id, 'SIGKILL');
+        } catch (e) {
+        }
+      }
       this._running.clear();
       for (const ws of this._sockets.values())
         ws.close();
