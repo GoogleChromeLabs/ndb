@@ -20,10 +20,11 @@
       },
       {
           "type": "view",
-          "id": "sources.threads",
+          "id": "ndb.processes-view",
           "title": "Node processes",
           "persistence": "permanent",
-          "className": "Ndb.NodeProcesses"
+          "className": "Ndb.NodeProcesses",
+          "location": "sources.sidebar-top"
       }
   ],
   "dependencies": ["ui", "sources", "timeline", "ndb"],
