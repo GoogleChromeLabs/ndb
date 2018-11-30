@@ -50,10 +50,6 @@
   // hacks to remove redundant sources extensions..
   const sourcesModule = moduleDescriptors.find(module => module.name === 'sources');
   const extensions = sourcesModule.extensions;
-  // ndb navigator files view does not contain add workspace folder button
-  const navigatorFilesIndex = extensions.findIndex(extension => extension.id === 'navigator-files');
-  if (navigatorFilesIndex !== -1)
-    extensions.splice(navigatorFilesIndex, 1);
   // ndb replaces threads view with own node processes view
   const threadsViewIndex = extensions.findIndex(extension => extension.className === 'Sources.ThreadsSidebarPane');
   if (threadsViewIndex !== -1)

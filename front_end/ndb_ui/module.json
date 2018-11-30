@@ -24,20 +24,10 @@
           "title": "Node processes",
           "persistence": "permanent",
           "className": "Ndb.NodeProcesses"
-      },
-      {
-          "type": "view",
-          "location": "navigator-view",
-          "id": "navigator-files",
-          "title": "Filesystem",
-          "order": 3,
-          "persistence": "permanent",
-          "className": "Ndb.FilesNavigatorView"
       }
   ],
   "dependencies": ["ui", "sources", "timeline", "ndb"],
   "scripts": [
-      "FilesNavigatorView.js",
       "RunConfiguration.js",
       "NodeProcesses.js",
       "../node_modules/xterm/dist/xterm.js",
