@@ -400,22 +400,6 @@ DOMTokenList.prototype.toggle = function(token, force) {
   return originalToggle.call(this, token, !!force);
 };
 
-Bindings.CompilerScriptMapping.prototype._sourceMapDetached = function(event) {
-  const script = /** @type {!SDK.Script} */ (event.data.client);
-  const frameId = script[Bindings.CompilerScriptMapping._frameIdSymbol];
-  const sourceMap = /** @type {!SDK.SourceMap} */ (event.data.sourceMap);
-  const bindings = script.isContentScript() ? this._contentScriptsBindings : this._regularBindings;
-  for (const sourceURL of sourceMap.sourceURLs()) {
-    const binding = bindings.get(sourceURL);
-    if (!binding)
-      continue;
-    binding.removeSourceMap(sourceMap, frameId);
-    if (!binding._uiSourceCode)
-      bindings.delete(sourceURL);
-  }
-  this._debuggerWorkspaceBinding.updateLocations(script);
-};
-
 /**
  * @param {string} sourceMapURL
  * @param {string} compiledURL

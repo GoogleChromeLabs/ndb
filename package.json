@@ -38,7 +38,7 @@
     "ndb-node-pty-prebuilt": "^0.8.0"
   },
   "devDependencies": {
-    "chrome-devtools-frontend": "^1.0.608857",
+    "chrome-devtools-frontend": "1.0.612075",
     "eslint": "^5.9.0",
     "mocha": "^5.2.0",
     "terser": "^3.8.2"

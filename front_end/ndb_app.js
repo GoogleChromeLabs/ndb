@@ -61,5 +61,6 @@
 
   self.runtime = new Runtime(moduleDescriptors);
   if (coreModuleNames)
-    return /** @type {!Promise<undefined>} */ (self.runtime._loadAutoStartModules(coreModuleNames));
+    await self.runtime._loadAutoStartModules(coreModuleNames);
+  Runtime._appStartedPromiseCallback();
 })('ndb_app');
