@@ -45,8 +45,14 @@ class FileSystemHandler {
         await new Promise(resolve => setTimeout(resolve, 0));
       const url = queue.shift();
 
-      const stat = fs.lstatSync(url);
-      const realPath = stat.isSymbolicLink() ? fs.realpathSync(url) : urlToPlatformPath(url.toString());
+      let stat;
+      let realPath;
+      try {
+        stat = fs.lstatSync(url);
+        realPath = stat.isSymbolicLink() ? fs.realpathSync(url) : urlToPlatformPath(url.toString());
+      } catch (e) {
+        continue;
+      }
       if (visited.has(realPath)) continue;
       visited.add(realPath);
 
