@@ -5,14 +5,19 @@
  */
 
 const fs = require('fs');
+const path = require('path');
 const { rpc, rpc_process } = require('carlo/rpc');
 
 class Terminal {
-  constructor(frontend, pty, nddStore, preload, cols, rows) {
+  constructor(frontend, pty, nddStore, cols, rows) {
     let shell = process.env.SHELL;
     if (!shell || !fs.existsSync(shell))
       shell = process.platform === 'win32' ? 'cmd.exe' : 'bash';
     const NDB_VERSION = require('../package.json').version;
+    let nodePath = process.env.NODE_PATH;
+    if (nodePath)
+      nodePath += process.platform === 'win32' ? ';' : ':';
+    nodePath += path.join(__dirname, '..', 'lib', 'preload');
     this._term = pty.spawn(shell, [], {
       name: 'xterm-color',
       cols: cols,
@@ -20,9 +25,10 @@ class Terminal {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        NODE_OPTIONS: `--require ${preload}`,
+        NODE_OPTIONS: `--require ndb/preload.js`,
         NDD_STORE: nddStore,
         NDD_WAIT_FOR_CONNECTION: 1,
+        NODE_PATH: nodePath,
         NDB_VERSION
       }
     });
@@ -44,10 +50,10 @@ class Terminal {
   }
 }
 
-function init(frontend, nddStore, preload, cols, rows) {
+function init(frontend, nddStore, cols, rows) {
   try {
     const pty = require('ndb-node-pty-prebuilt');
-    return rpc.handle(new Terminal(frontend, pty, nddStore, preload, cols, rows));
+    return rpc.handle(new Terminal(frontend, pty, nddStore, cols, rows));
   } catch (e) {
     frontend.initFailed(e.stack);
     process.exit(0);

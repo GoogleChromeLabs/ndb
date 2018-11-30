@@ -134,8 +134,13 @@ class NddService {
   }
 
   debug(execPath, args, options) {
+    let nodePath = process.env.NODE_PATH;
+    if (nodePath)
+      nodePath += process.platform === 'win32' ? ';' : ':';
+    nodePath += path.join(__dirname, '..', 'lib', 'preload');
     const env = {
-      NODE_OPTIONS: `--require ${options.preload}`,
+      NODE_OPTIONS: `--require ndb/preload.js`,
+      NODE_PATH: nodePath,
       NDD_STORE: this._nddStores[0],
       NDD_WAIT_FOR_CONNECTION: 1,
       NDB_VERSION
