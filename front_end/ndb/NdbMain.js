@@ -44,7 +44,7 @@ Ndb.NdbMain = class extends Common.Object {
     if (Common.moduleSetting('autoStartMain').get()) {
       const main = await Ndb.mainConfiguration();
       if (main)
-        Ndb.nodeProcessManager.debug(await Ndb.nodeExecPath(), main.args);
+        Ndb.nodeProcessManager.debug(main.execPath, main.args);
     }
 
     startWatchdog();
