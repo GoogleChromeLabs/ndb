@@ -14,7 +14,7 @@ class Terminal {
     if (!shell || !fs.existsSync(shell))
       shell = process.platform === 'win32' ? 'cmd.exe' : 'bash';
     const NDB_VERSION = require('../package.json').version;
-    let nodePath = process.env.NODE_PATH;
+    let nodePath = process.env.NODE_PATH || '';
     if (nodePath)
       nodePath += process.platform === 'win32' ? ';' : ':';
     nodePath += path.join(__dirname, '..', 'lib', 'preload');
