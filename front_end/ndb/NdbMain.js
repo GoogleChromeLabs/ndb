@@ -4,16 +4,16 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-Ndb.environment = function() {
-  if (!Ndb._environmentPromise)
-    Ndb._environmentPromise = getProcessInfo();
-  return Ndb._environmentPromise;
-};
-
 Ndb.nodeExecPath = function() {
   if (!Ndb._nodeExecPathPromise)
     Ndb._nodeExecPathPromise = Ndb.backend.which('node').then(result => result.resolvedPath);
   return Ndb._nodeExecPathPromise;
+};
+
+Ndb.processInfo = function() {
+  if (!Ndb._processInfoPromise)
+    Ndb._processInfoPromise = Ndb.backend.processInfo();
+  return Ndb._processInfoPromise;
 };
 
 /**
@@ -46,13 +46,11 @@ Ndb.NdbMain = class extends Common.Object {
       if (main)
         Ndb.nodeProcessManager.debug(main.execPath, main.args);
     }
-
-    startWatchdog();
   }
 
   async _addDefaultFileSystem() {
-    const environment = await Ndb.environment();
-    await Ndb.nodeProcessManager.addFileSystem(environment.cwd);
+    const info = await Ndb.processInfo();
+    await Ndb.nodeProcessManager.addFileSystem(info.cwd);
   }
 
   async _repl() {
@@ -99,8 +97,8 @@ Ndb.NdbMain = class extends Common.Object {
 };
 
 Ndb.mainConfiguration = async() => {
-  const environment = await Ndb.environment();
-  const cmd = environment.argv.slice(2);
+  const info = await Ndb.processInfo();
+  const cmd = info.argv.slice(2);
   if (cmd.length === 0 || cmd[0] === '.')
     return null;
   let execPath;
@@ -189,7 +187,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
     const target = this._targetManager.createTarget(
         pid, processInfo.userFriendlyName(), SDK.Target.Type.Node,
         parentTarget, pid);
-    if (!processInfo.isRepl() && shouldPauseAtStart(await Ndb.environment(), payload.argv)) {
+    if (!processInfo.isRepl() && shouldPauseAtStart(payload.argv)) {
       target.runtimeAgent().invoke_evaluate({
         expression: `process.breakAtStart && process.breakAtStart()`,
         includeCommandLineAPI: true
@@ -197,7 +195,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
     }
     return target.runtimeAgent().runIfWaitingForDebugger();
 
-    function shouldPauseAtStart(environment, argv) {
+    function shouldPauseAtStart(argv) {
       if (argv.find(arg => arg.endsWith('ndb/inspect-brk')))
         return true;
       if (!Common.moduleSetting('pauseAtStart').get())
@@ -235,9 +233,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
     if (!this._servicePromise) {
       async function service() {
         const service = await Ndb.backend.createService('ndd_service.js');
-        const environment = await Ndb.environment();
-        await service.init(rpc.handle(this),
-            environment.nddSharedStore);
+        await service.init(rpc.handle(this));
         InspectorFrontendHost.sendMessageToBackend = this._sendMesage.bind(this);
         return service;
       }
@@ -266,13 +262,12 @@ Ndb.NodeProcessManager = class extends Common.Object {
     const service = await this._service();
     const debugId = options.data || String(++this._lastDebugId);
     this._lastStarted = {execPath, args, debugId};
-    const environment = await Ndb.environment();
+    const info = await Ndb.processInfo();
     return service.debug(
         execPath, args, {
           ...options,
           data: debugId,
-          cwd: environment.cwd,
-          preload: environment.preload
+          cwd: info.cwd,
         });
   }
 
@@ -428,18 +423,3 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
     return null;
   }
 };
-
-async function startWatchdog() {
-  if (!Runtime.queryParam('debugFrontend'))
-    return;
-  const service = await Ndb.backend.createService('ping.js');
-  checkBackend();
-
-  async function checkBackend() {
-    const timeout = setTimeout(() => window.close(), 3000);
-    service.ping().then(() => {
-      clearTimeout(timeout);
-      setTimeout(checkBackend, 3000);
-    });
-  }
-}

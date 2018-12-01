@@ -5,32 +5,20 @@
  */
 
 (function(){
-  let hostBackend;
-
   InspectorFrontendHost.getPreferences = async function(callback) {
     [Ndb.backend] = await carlo.loadParams();
-    const info = await getProcessInfo();
-    hostBackend = await Ndb.backend.createService('inspector_frontend_host.js', info.configDir);
-    callback(await hostBackend.getPreferences());
+    const prefs = {
+      '__bundled__uiTheme': '"dark"'
+    };
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      prefs[key] = window.localStorage.getItem(key);
+    }
+    callback(prefs);
   };
 
   InspectorFrontendHost.isHostedMode = _ => false;
   InspectorFrontendHost.copyText = text => navigator.clipboard.writeText(text);
-  InspectorFrontendHost.openInNewTab = url => hostBackend.openInNewTab(url);
-  InspectorFrontendHost.setPreference = (name, value) => hostBackend.setPreference(name, value);
-  InspectorFrontendHost.removePreference = name => hostBackend.removePreference(name);
-  InspectorFrontendHost.clearPreferences = () => hostBackend.clearPreferences();
+  InspectorFrontendHost.openInNewTab = url => Ndb.backend.openInNewTab(url);
   InspectorFrontendHost.bringToFront = () => Ndb.backend.bringToFront();
-
-  Common.Settings.prototype._storageFromType = function(storageType) {
-    switch (storageType) {
-      case (Common.SettingStorageType.Local):
-        return this._globalStorage;
-      case (Common.SettingStorageType.Session):
-        return this._sessionStorage;
-      case (Common.SettingStorageType.Global):
-        return this._globalStorage;
-    }
-    return this._globalStorage;
-  };
 })();
