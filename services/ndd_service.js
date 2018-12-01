@@ -134,7 +134,7 @@ class NddService {
   }
 
   debug(execPath, args, options) {
-    let nodePath = process.env.NODE_PATH;
+    let nodePath = process.env.NODE_PATH || '';
     if (nodePath)
       nodePath += process.platform === 'win32' ? ';' : ':';
     nodePath += path.join(__dirname, '..', 'lib', 'preload');
