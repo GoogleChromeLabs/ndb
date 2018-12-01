@@ -80,8 +80,8 @@ class Preferences {
 
 class InspectorFrontendHost {
   constructor(configDir) {
+    require('../lib/process_utility.js')('inspector_frontend_host', () => this.dispose());
     this._preferences = new Preferences(configDir);
-    require('../lib/process_utility.js')(() => this.dispose());
   }
 
   /**
