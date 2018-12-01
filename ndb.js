@@ -5,13 +5,7 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-const updateNotifier = require('update-notifier');
-// Tell user if there's a newer version of ndb.
-updateNotifier({pkg: require('./package.json')}).notify({isGlobal: true});
-
-const os = require('os');
-const path = require('path');
-const {launch} = require('./lib/launcher.js');
+require('update-notifier')({pkg: require('./package.json')}).notify({isGlobal: true});
 
 if (process.argv.length > 2 && (process.argv[2] === '-v' || process.argv[2] === '--version')) {
   console.log(`v${require('./package.json').version}`);
@@ -37,11 +31,5 @@ if (process.argv.length > 2 && process.argv[2] === '--help') {
   process.exit(0);
 }
 
-launch({
-  configDir: path.join(os.homedir(), '.ndb'),
-  argv: process.argv,
-  cwd: process.cwd(),
-  debugFrontend: !!process.env.NDB_DEBUG_FRONTEND,
-  appName: 'ndb_app',
-  releaseFrontendFolder: path.join(__dirname, '.local-frontend')
-}).then(app => app.mainWindow().bringToFront());
+const {launch} = require('./lib/launcher.js');
+launch();

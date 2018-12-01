@@ -22,4 +22,4 @@ if (!options.includes('ndb/inspect'))
   options += ' -r ndb/inspect';
 process.env.NODE_OPTIONS = options;
 
-require('./lib/preload.js');
+require('./lib/preload/ndb/preload.js');

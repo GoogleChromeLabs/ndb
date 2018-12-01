@@ -31,11 +31,21 @@ class NddService {
     this._frontend = null;
   }
 
-  async init(frontend, nddSharedStore) {
+  async init(frontend) {
     this._frontend = frontend;
     this._nddStores = [await fsMkdtemp(path.join(os.tmpdir(), 'ndb-'))];
-    if (nddSharedStore)
-      this._nddStores.push(nddSharedStore);
+
+    try {
+      const ndbDir = path.join(os.homedir(), '.ndb');
+      if (!fs.existsSync(ndbDir))
+        fs.mkdirSync(ndbDir);
+      const nddStoreDir = path.join(ndbDir, 'ndd_store');
+      if (!fs.existsSync(nddStoreDir))
+        fs.mkdirSync(nddStoreDir);
+      this._nddStores.push(nddStoreDir);
+    } catch (e) {
+    }
+
     this._nddStoreWatchers = [];
     for (const nddStore of this._nddStores) {
       const watcher = chokidar.watch(nddStore, {

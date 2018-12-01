@@ -20,9 +20,9 @@ Ndb.RunConfiguration = class extends UI.VBox {
     const main = await Ndb.mainConfiguration();
     if (main)
       configurations.push(main);
-    const environment = await Ndb.environment();
-    if (environment.pkg) {
-      const scripts = environment.pkg.scripts || {};
+    const pkg = await Ndb.backend.pkg();
+    if (pkg) {
+      const scripts = pkg.scripts || {};
       this._items.replaceAll(configurations.concat(Object.keys(scripts).map(name => ({
         name,
         command: scripts[name],
