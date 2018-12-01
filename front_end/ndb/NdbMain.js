@@ -38,7 +38,7 @@ Ndb.NdbMain = class extends Common.Object {
     // Create root Main target.
     SDK.targetManager.createTarget('<root>', ls`Root`, SDK.Target.Type.Browser, null);
 
-    this._startRepl();
+    this._repl();
 
     Runtime.experiments.setEnabled('timelineTracingJSProfile', false);
     if (Common.moduleSetting('autoStartMain').get()) {
@@ -55,10 +55,16 @@ Ndb.NdbMain = class extends Common.Object {
     await Ndb.nodeProcessManager.addFileSystem(environment.cwd);
   }
 
-  async _startRepl() {
-    const environment = await Ndb.environment();
-    Ndb.nodeProcessManager.debug(await Ndb.nodeExecPath(), [environment.repl])
-        .then(this._startRepl.bind(this));
+  async _repl() {
+    const code = btoa(`console.log('Welcome to the ndb %cR%cE%cP%cL%c!',
+      'color:#8bc34a', 'color:#ffc107', 'color:#ff5722', 'color:#2196f3', 'color:inherit');
+      setInterval(_ => 0, 2147483647)//# sourceURL=repl.js`);
+    const args = ['--title=ndb/repl',
+      '-e', `eval(Buffer.from('${code}', 'base64').toString())`];
+    const options = { ignoreOutput: true };
+    const node = await Ndb.nodeExecPath();
+    for (;;)
+      await Ndb.nodeProcessManager.debug(node, args, options);
   }
 
   static _defaultExcludePattern() {
@@ -183,13 +189,13 @@ Ndb.NodeProcessManager = class extends Common.Object {
     const target = this._targetManager.createTarget(
         pid, processInfo.userFriendlyName(), SDK.Target.Type.Node,
         parentTarget, pid);
-    if (shouldPauseAtStart(await Ndb.environment(), payload.argv)) {
+    if (!processInfo.isRepl() && shouldPauseAtStart(await Ndb.environment(), payload.argv)) {
       target.runtimeAgent().invoke_evaluate({
         expression: `process.breakAtStart && process.breakAtStart()`,
         includeCommandLineAPI: true
       });
     }
-    await target.runtimeAgent().runIfWaitingForDebugger();
+    return target.runtimeAgent().runIfWaitingForDebugger();
 
     function shouldPauseAtStart(environment, argv) {
       if (argv.find(arg => arg.endsWith('ndb/inspect-brk')))
@@ -197,8 +203,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
       if (!Common.moduleSetting('pauseAtStart').get())
         return false;
       const [_, arg] = argv;
-      if (arg && (arg === environment.repl ||
-          arg.endsWith('/bin/npm') || arg.endsWith('\\bin\\npm') ||
+      if (arg && (arg.endsWith('/bin/npm') || arg.endsWith('\\bin\\npm') ||
           arg.endsWith('/bin/yarn') || arg.endsWith('\\bin\\yarn') ||
           arg.endsWith('/bin/npm-cli.js') || arg.endsWith('\\bin\\npm-cli.js')))
         return false;
@@ -256,13 +261,15 @@ Ndb.NodeProcessManager = class extends Common.Object {
     service.disconnect(target.id());
   }
 
-  async debug(execPath, args) {
+  async debug(execPath, args, options) {
+    options = options || {};
     const service = await this._service();
     const debugId = String(++this._lastDebugId);
     this._lastStarted = {execPath, args, debugId};
     const environment = await Ndb.environment();
     return service.debug(
         execPath, args, {
+          ...options,
           data: debugId,
           cwd: environment.cwd,
           preload: environment.preload
@@ -331,6 +338,7 @@ Ndb.ProcessInfo = class {
     this._argv = payload.argv;
     this._cwd = payload.cwd;
     this._data = payload.data;
+    this._isRepl = payload.argv.length > 1 && payload.argv[1] === '--title=ndb/repl';
   }
 
   argv() {
@@ -346,6 +354,8 @@ Ndb.ProcessInfo = class {
   }
 
   userFriendlyName() {
+    if (this._isRepl)
+      return 'repl';
     return this.argv().map(arg => {
       const index1 = arg.lastIndexOf('/');
       const index2 = arg.lastIndexOf('\\');
@@ -355,8 +365,8 @@ Ndb.ProcessInfo = class {
     }).join(' ');
   }
 
-  isRepl(environment) {
-    return this._argv.length === 2 && this._argv[1] === environment.repl;
+  isRepl() {
+    return this._isRepl;
   }
 };
 

@@ -43,7 +43,7 @@ Ndb.NodeProcesses = class extends UI.VBox {
     if (target.id() === '<root>')
       return;
     const processInfo = Ndb.nodeProcessManager.infoForTarget(target);
-    if (!processInfo || processInfo.isRepl(await Ndb.environment()))
+    if (!processInfo || processInfo.isRepl())
       return;
     const f = UI.Fragment.build`
       <div class=process-item>
