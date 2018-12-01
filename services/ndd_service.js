@@ -150,20 +150,22 @@ class NddService {
     const p = spawn(execPath, args, {
       cwd: options.cwd,
       env: { ...process.env, ...env },
-      stdio: ['inherit', 'inherit', 'pipe']
+      stdio: options.ignoreOutput ? 'ignore' : ['inherit', 'inherit', 'pipe']
     });
-    const filter = [
-      Buffer.from('Debugger listening on', 'utf8'),
-      Buffer.from('Waiting for the debugger to disconnect...', 'utf8'),
-      Buffer.from('Debugger attached.', 'utf8')
-    ];
-    p.stderr.on('data', data => {
-      for (const prefix of filter) {
-        if (Buffer.compare(data.slice(0, prefix.length), prefix) === 0)
-          return;
-      }
-      process.stderr.write(data);
-    });
+    if (!options.ignoreOutput) {
+      const filter = [
+        Buffer.from('Debugger listening on', 'utf8'),
+        Buffer.from('Waiting for the debugger to disconnect...', 'utf8'),
+        Buffer.from('Debugger attached.', 'utf8')
+      ];
+      p.stderr.on('data', data => {
+        for (const prefix of filter) {
+          if (Buffer.compare(data.slice(0, prefix.length), prefix) === 0)
+            return;
+        }
+        process.stderr.write(data);
+      });
+    }
     return new Promise((resolve, reject) => {
       p.on('exit', code => resolve(code));
       p.on('error', error => reject(error));
