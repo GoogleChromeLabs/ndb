@@ -14,6 +14,7 @@ const isbinaryfile = require('isbinaryfile');
 
 class SearchBackend {
   constructor(frontend) {
+    require('../lib/process_utility.js')('search', () => this.dispose());
     this._frontend = frontend;
     this._activeIndexing = new Set();
     this._index = new Map();
@@ -22,8 +23,6 @@ class SearchBackend {
     this._lastFileNameIndex = 0;
     this._indexToFileName = new Map();
     this._fileNameToIndex = new Map();
-
-    require('../lib/process_utility.js')(() => this.dispose());
   }
 
   /**

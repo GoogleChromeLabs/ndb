@@ -8,7 +8,7 @@ const { rpc, rpc_process } = require('carlo/rpc');
 
 class Handler {
   constructor() {
-    require('../lib/process_utility.js')(() => this.dispose());
+    require('../lib/process_utility.js')('ping', () => this.dispose());
   }
 
   ping() {}

@@ -23,12 +23,12 @@ const removeFolder = util.promisify(require('rimraf'));
 
 class NddService {
   constructor() {
+    require('../lib/process_utility.js')('ndd_service', () => this.dispose());
     this._nddStores = [];
     this._nddStoreWatchers = [];
     this._running = new Set();
     this._sockets = new Map();
     this._frontend = null;
-    require('../lib/process_utility.js')(() => this.dispose());
   }
 
   async init(frontend, nddSharedStore) {

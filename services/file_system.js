@@ -19,8 +19,8 @@ function urlToPlatformPath(fileURL) {
 
 class FileSystemHandler {
   constructor() {
+    require('../lib/process_utility.js')('file_system', () => this.dispose());
     this._watcher = null;
-    require('../lib/process_utility.js')(() => this.dispose());
   }
   /**
    * @param {string} fileURL
