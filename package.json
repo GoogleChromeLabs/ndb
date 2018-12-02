@@ -17,6 +17,7 @@
     "dummyScriptForTest": "node -e 'console.log(239)'",
     "unit": "./node_modules/mocha/bin/mocha test/test.js",
     "integration": "node test/integration.js",
+    "test-platform": "node test/platform.spec.js",
     "debug": "node debug.js"
   },
   "author": "The Chromium Authors",
