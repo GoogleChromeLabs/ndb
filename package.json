@@ -23,7 +23,7 @@
   "author": "The Chromium Authors",
   "license": "Apache-2.0",
   "dependencies": {
-    "carlo": "^0.9.37",
+    "carlo": "^0.9.39",
     "chokidar": "^2.0.4",
     "isbinaryfile": "^3.0.3",
     "mime": "^2.3.1",
