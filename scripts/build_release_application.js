@@ -259,7 +259,7 @@ class ReleaseBuilder {
       const fullName = this._lookupFile(resource);
       let content = await this._readFile(fullName, 'utf8');
       content = content.replace(/\\/g, '\\\\');
-      content = content.replace(/\n/g, '\\n');
+      content = content.replace(/\r?\n/g, '\\n');
       content = content.replace(/"/g, '\\"');
       return `Runtime.cachedResources["${resource.split(path.sep).join('/')}"] = "${content}";\n`;
     }))).join(''));
