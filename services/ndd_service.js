@@ -160,7 +160,8 @@ class NddService {
     const p = spawn(execPath, args, {
       cwd: options.cwd,
       env: { ...process.env, ...env },
-      stdio: options.ignoreOutput ? 'ignore' : ['inherit', 'inherit', 'pipe']
+      stdio: options.ignoreOutput ? 'ignore' : ['inherit', 'inherit', 'pipe'],
+      windowsHide: true
     });
     if (!options.ignoreOutput) {
       const filter = [
