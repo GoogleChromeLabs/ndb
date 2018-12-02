@@ -154,7 +154,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
     this._lastDebugId = 0;
     this._lastStarted = null;
     this._targetManager = targetManager;
-    this._cwds = new Set();
+    this._cwds = new Map();
     this._targetManager.addModelListener(
         SDK.RuntimeModel, SDK.RuntimeModel.Events.ExecutionContextDestroyed, this._onExecutionContextDestroyed, this);
   }
@@ -169,12 +169,17 @@ Ndb.NodeProcessManager = class extends Common.Object {
   }
 
   async addFileSystem(cwd) {
-    if (this._cwds.has(cwd))
-      return;
-    this._cwds.add(cwd);
-    const cwdUrl = Common.ParsedURL.platformPathToURL(cwd);
-    const fileSystemManager = Persistence.isolatedFileSystemManager;
-    fileSystemManager.addPlatformFileSystem(cwdUrl, await Ndb.FileSystem.create(fileSystemManager, cwd, cwdUrl));
+    let promise = this._cwds.get(cwd);
+    if (!promise) {
+      async function innerAdd() {
+        const cwdUrl = Common.ParsedURL.platformPathToURL(cwd);
+        const fileSystemManager = Persistence.isolatedFileSystemManager;
+        fileSystemManager.addPlatformFileSystem(cwdUrl, await Ndb.FileSystem.create(fileSystemManager, cwd, cwdUrl));
+      }
+      promise = innerAdd();
+      this._cwds.set(cwd, promise);
+    }
+    return promise;
   }
 
   async detected(payload) {
@@ -182,7 +187,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
     const processInfo = new Ndb.ProcessInfo(payload);
     this._processes.set(pid, processInfo);
 
-    this.addFileSystem(processInfo.cwd());
+    await this.addFileSystem(processInfo.cwd());
     const parentTarget = (payload.ppid ? this._targetManager.targetById(payload.ppid) || this._targetManager.mainTarget() : this._targetManager.mainTarget());
     const target = this._targetManager.createTarget(
         pid, processInfo.userFriendlyName(), SDK.Target.Type.Node,
