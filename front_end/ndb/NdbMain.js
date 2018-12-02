@@ -56,10 +56,10 @@ Ndb.NdbMain = class extends Common.Object {
   async _repl() {
     const code = btoa(`console.log('Welcome to the ndb %cR%cE%cP%cL%c!',
       'color:#8bc34a', 'color:#ffc107', 'color:#ff5722', 'color:#2196f3', 'color:inherit');
+      process.title = 'ndb/repl';
       setInterval(_ => 0, 2147483647)//# sourceURL=repl.js`);
-    const args = ['--title=ndb/repl',
-      '-e', `eval(Buffer.from('${code}', 'base64').toString())`];
-    const options = { ignoreOutput: true };
+    const args = ['-e', `eval(Buffer.from('${code}', 'base64').toString())`];
+    const options = { ignoreOutput: true, data: 'ndb/repl' };
     const node = await Ndb.nodeExecPath();
     for (;;)
       await Ndb.nodeProcessManager.debug(node, args, options);
@@ -260,7 +260,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
   async debug(execPath, args, options) {
     options = options || {};
     const service = await this._service();
-    const debugId = String(++this._lastDebugId);
+    const debugId = options.data || String(++this._lastDebugId);
     this._lastStarted = {execPath, args, debugId};
     const info = await Ndb.processInfo();
     return service.debug(
@@ -333,7 +333,7 @@ Ndb.ProcessInfo = class {
     this._argv = payload.argv;
     this._cwd = payload.cwd;
     this._data = payload.data;
-    this._isRepl = payload.argv.length > 1 && payload.argv[1] === '--title=ndb/repl';
+    this._isRepl = payload.data === 'ndb/repl';
   }
 
   argv() {
