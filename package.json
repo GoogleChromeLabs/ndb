@@ -1,6 +1,6 @@
 {
   "name": "ndb",
-  "version": "1.0.40",
+  "version": "1.0.41",
   "description": "Chrome DevTools for Node.js",
   "main": "ndb.js",
   "repository": "github:GoogleChromeLabs/ndb",
