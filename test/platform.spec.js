@@ -27,8 +27,8 @@ function addTests(testRunner) {
   xit('--title flag (fails on Node v8.x)', async function() {
     const result = await new Promise(resolve => execFile(
         process.execPath, ['--title=abc', '-p', 'process.title'], (error, stdout, stderr) => {
-      resolve(stdout + stderr);
-    }));
+          resolve(stdout + stderr);
+        }));
     expect(result).toBe('abc\n');
   });
-};
+}
