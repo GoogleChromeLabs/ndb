@@ -88,10 +88,11 @@ Ndb.NdbMain = class extends Common.Object {
 
   static _calculateBlackboxState() {
     const blackboxInternalScripts = Common.moduleSetting('blackboxInternalScripts').get();
+    const PATTERN = '^internal[\\/].*';
     const regexPatterns = Common.moduleSetting('skipStackFramesPattern').getAsArray()
-        .filter(({pattern}) => pattern !== '^internal[\\/].*');
+        .filter(({pattern}) => pattern !== PATTERN && pattern !== '^internal/.*');
     if (blackboxInternalScripts)
-      regexPatterns.push({pattern: '^internal/.*' });
+      regexPatterns.push({pattern: PATTERN });
     Common.moduleSetting('skipStackFramesPattern').setAsArray(regexPatterns);
   }
 };
@@ -149,7 +150,6 @@ Ndb.NodeProcessManager = class extends Common.Object {
   constructor(targetManager) {
     super();
     this._servicePromise = null;
-    this._connection = null;
     this._processes = new Map();
     this._lastDebugId = 0;
     this._lastStarted = null;
@@ -295,41 +295,6 @@ Ndb.NodeProcessManager = class extends Common.Object {
     await Promise.all(promises);
     const {execPath, args} = this._lastStarted;
     await this.debug(execPath, args);
-  }
-};
-
-/**
- * @implements {Protocol.InspectorBackend.Connection}
- */
-Ndb.Connection = class {
-  constructor(connection, params) {
-    this._onDisconnect = params.onDisconnect;
-    this._onMessage = params.onMessage;
-    this._connection = connection;
-    this._connection.setClient(rpc.handle(this));
-  }
-
-  messageReceived(message) {
-    this._onMessage.call(null, message);
-  }
-
-  closed() {
-    this._onDisconnect.call(null, 'websocket closed');
-  }
-
-  /**
-   * @param {string} domain
-   * @param {!Protocol.InspectorBackend.Connection.MessageObject} messageObject
-   */
-  sendMessage(domain, messageObject) {
-    return this._connection.send(JSON.stringify(messageObject));
-  }
-
-  /**
-   * @return {!Promise}
-   */
-  disconnect() {
-    return this._connection.disconnect();
   }
 };
 
