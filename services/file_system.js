@@ -32,7 +32,9 @@ class FileSystemHandler {
       excludeRegex = new RegExp(excludePattern);
     } catch (e) {
     }
-    const queue = [new URL(fileURL)];
+    const fileURLBase = new URL(fileURL);
+    const fileURLBaseLength = fileURLBase.href.length;
+    const queue = [fileURLBase];
     const visited = new Set();
 
     const filePaths = new Set();
@@ -61,17 +63,17 @@ class FileSystemHandler {
         const urlString = url.toString();
         if (this._watcher) this._watcher.add(realPath);
         names.forEach(name => {
-          if (name === '.git') gitFolders.add(urlString.substr(fileURL.length + 1));
+          if (name === '.git') gitFolders.add(urlString.substr(fileURLBaseLength + 1));
           const fileName = urlString + '/' + name;
-          if (excludeRegex && excludeRegex.test(fileName.substr(fileURL.length) + '/'))
-            excludedFolders.add(fileName.substr(fileURL.length + 1));
+          if (excludeRegex && excludeRegex.test(fileName.substr(fileURLBaseLength) + '/'))
+            excludedFolders.add(fileName.substr(fileURLBaseLength + 1));
           else
             queue.push(new URL(fileName));
         });
       } else if (stat.isFile()) {
         const urlString = url.toString();
         if (excludeRegex && excludeRegex.test(urlString)) continue;
-        filePaths.add(urlString.substr(fileURL.length + 1));
+        filePaths.add(urlString.substr(fileURLBaseLength + 1));
       }
     }
     return {
