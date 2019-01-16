@@ -26,7 +26,7 @@ class Terminal {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        NODE_OPTIONS: `--require ndb/preload.js`,
+        NODE_OPTIONS: `--require ${path.join(nodePath, 'ndb/preload.js')}`,
         NDD_STORE: nddStore,
         NDD_WAIT_FOR_CONNECTION: 1,
         NODE_PATH: nodePath,
