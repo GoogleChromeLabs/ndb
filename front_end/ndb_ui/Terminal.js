@@ -10,6 +10,7 @@ Ndb.Terminal = class extends UI.VBox {
   constructor() {
     super(true);
     this.registerRequiredCSS('node_modules/xterm/dist/xterm.css');
+    this.element.addEventListener('contextmenu', this._onContextMenu.bind(this));
   }
 
   static _createTerminal() {
@@ -40,6 +41,21 @@ Ndb.Terminal = class extends UI.VBox {
         nddStore,
         this._terminal.cols,
         this._terminal.rows);
+  }
+
+  /**
+   * @param {!Event} event
+   */
+  _onContextMenu(event) {
+    const selection = this._terminal ? this._terminal.getSelection() : null;
+    const contextMenu = new UI.ContextMenu(event);
+    const copyItem = contextMenu.defaultSection().appendItem(ls`Copy`, () => navigator.clipboard.writeText(selection));
+    copyItem.setEnabled(!!selection);
+    contextMenu.defaultSection().appendItem(ls`Paste`, async () => {
+      if (this._backend)
+        this._backend.write(await navigator.clipboard.readText());
+    });
+    contextMenu.show();
   }
 
   /**
