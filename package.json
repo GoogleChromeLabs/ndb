@@ -37,7 +37,7 @@
     "ndb-node-pty-prebuilt": "^0.8.0"
   },
   "devDependencies": {
-    "chrome-devtools-frontend": "1.0.612830",
+    "chrome-devtools-frontend": "^1.0.619856",
     "eslint": "^5.9.0",
     "mocha": "^5.2.0",
     "rimraf": "^2.6.2",
