@@ -411,9 +411,8 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
     try {
       const modulePrefix = await Ndb.backend.getNodeScriptPrefix();
       const debuggerModel = Array.from(Bindings.debuggerWorkspaceBinding._debuggerModelToData.keys())[1];
-      if (isNodeWrappedModule(compiledURL, modulePrefix, debuggerModel))
+      if (await isNodeWrappedModule(compiledURL, modulePrefix, debuggerModel))
         for (const mapping of textSourceMap.mappings()) mapping.columnNumber += modulePrefix.length;
-
     } catch (e) {
       console.error(e);
       Common.console.warn('DevTools failed to fix SourceMap for node script: ' + sourceMapURL);
