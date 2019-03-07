@@ -371,6 +371,23 @@ DOMTokenList.prototype.toggle = function(token, force) {
 };
 
 /**
+ * @param {string} sourceURL
+ * @param {string} modulePrefix
+ * @param {SDK.DebuggerModel} debuggerModel
+ * @return {!Promise<boolean>}
+ */
+async function isNodeWrappedModule(sourceURL, modulePrefix, debuggerModel) {
+  for (const script of debuggerModel.scripts()) {
+    if (script.sourceURL === sourceURL) {
+      const content = await script.originalContentProvider().requestContent();
+      return content.startsWith(modulePrefix);
+    }
+  }
+
+  return false;
+}
+
+/**
  * @param {string} sourceMapURL
  * @param {string} compiledURL
  * @return {!Promise<?SDK.TextSourceMap>}
@@ -391,8 +408,17 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
   }
 
   if (textSourceMap._baseURL.startsWith('file://')) {
-    const prefix = await Ndb.backend.getNodeScriptPrefix();
-    for (const mapping of textSourceMap.mappings()) mapping.columnNumber += prefix.length;
+    try {
+      const modulePrefix = await Ndb.backend.getNodeScriptPrefix();
+      const debuggerModel = Array.from(Bindings.debuggerWorkspaceBinding._debuggerModelToData.keys())[1];
+      if (isNodeWrappedModule(compiledURL, modulePrefix, debuggerModel))
+        for (const mapping of textSourceMap.mappings()) mapping.columnNumber += modulePrefix.length;
+
+    } catch (e) {
+      console.error(e);
+      Common.console.warn('DevTools failed to fix SourceMap for node script: ' + sourceMapURL);
+      // return the source map anyways.
+    }
   }
 
   return textSourceMap;
