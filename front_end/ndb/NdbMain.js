@@ -356,11 +356,6 @@ Ndb.RestartActionDelegate = class {
   }
 };
 
-SDK.DebuggerModel.prototype.scheduleStepIntoAsync = function() {
-  this._agent.scheduleStepIntoAsync();
-  this._agent.invoke_stepInto({breakOnAsyncCall: true});
-};
-
 // Temporary hack until frontend with fix is rolled.
 // fix: TBA.
 SDK.Target.prototype.decorateLabel = function(label) {
@@ -376,6 +371,23 @@ DOMTokenList.prototype.toggle = function(token, force) {
 };
 
 /**
+ * @param {string} sourceURL
+ * @param {string} modulePrefix
+ * @param {SDK.DebuggerModel} debuggerModel
+ * @return {!Promise<boolean>}
+ */
+async function isNodeWrappedModule(sourceURL, modulePrefix, debuggerModel) {
+  for (const script of debuggerModel.scripts()) {
+    if (script.sourceURL === sourceURL) {
+      const content = await script.originalContentProvider().requestContent();
+      return content.startsWith(modulePrefix);
+    }
+  }
+
+  return false;
+}
+
+/**
  * @param {string} sourceMapURL
  * @param {string} compiledURL
  * @return {!Promise<?SDK.TextSourceMap>}
@@ -385,11 +397,28 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
   const {payload, error} = await Ndb.backend.loadSourceMap(sourceMapURL, compiledURL);
   if (error || !payload)
     return null;
+
+  let textSourceMap;
   try {
-    return new SDK.TextSourceMap(compiledURL, sourceMapURL, payload);
+    textSourceMap = new SDK.TextSourceMap(compiledURL, sourceMapURL, payload);
   } catch (e) {
     console.error(e);
     Common.console.warn('DevTools failed to parse SourceMap: ' + sourceMapURL);
     return null;
   }
+
+  if (textSourceMap._baseURL.startsWith('file://')) {
+    try {
+      const modulePrefix = await Ndb.backend.getNodeScriptPrefix();
+      const debuggerModel = Array.from(Bindings.debuggerWorkspaceBinding._debuggerModelToData.keys())[1];
+      if (await isNodeWrappedModule(compiledURL, modulePrefix, debuggerModel))
+        for (const mapping of textSourceMap.mappings()) mapping.columnNumber += modulePrefix.length;
+    } catch (e) {
+      console.error(e);
+      Common.console.warn('DevTools failed to fix SourceMap for node script: ' + sourceMapURL);
+      // return the source map anyways.
+    }
+  }
+
+  return textSourceMap;
 };
