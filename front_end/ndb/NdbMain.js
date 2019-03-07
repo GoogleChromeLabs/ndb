@@ -356,11 +356,6 @@ Ndb.RestartActionDelegate = class {
   }
 };
 
-SDK.DebuggerModel.prototype.scheduleStepIntoAsync = function() {
-  this._agent.scheduleStepIntoAsync();
-  this._agent.invoke_stepInto({breakOnAsyncCall: true});
-};
-
 // Temporary hack until frontend with fix is rolled.
 // fix: TBA.
 SDK.Target.prototype.decorateLabel = function(label) {
@@ -385,11 +380,18 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
   const {payload, error} = await Ndb.backend.loadSourceMap(sourceMapURL, compiledURL);
   if (error || !payload)
     return null;
+
+  let textSourceMap;
   try {
-    return new SDK.TextSourceMap(compiledURL, sourceMapURL, payload);
+    textSourceMap = new SDK.TextSourceMap(compiledURL, sourceMapURL, payload);
   } catch (e) {
     console.error(e);
     Common.console.warn('DevTools failed to parse SourceMap: ' + sourceMapURL);
     return null;
   }
+
+  if (textSourceMap._baseURL.startsWith('file://'))
+    for (const mapping of textSourceMap.mappings()) mapping.columnNumber += 62;
+
+  return textSourceMap;
 };
