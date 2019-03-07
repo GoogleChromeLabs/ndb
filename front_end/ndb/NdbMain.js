@@ -390,8 +390,10 @@ SDK.TextSourceMap.load = async function(sourceMapURL, compiledURL) {
     return null;
   }
 
-  if (textSourceMap._baseURL.startsWith('file://'))
-    for (const mapping of textSourceMap.mappings()) mapping.columnNumber += 62;
+  if (textSourceMap._baseURL.startsWith('file://')) {
+    const prefix = await Ndb.backend.getNodeScriptPrefix();
+    for (const mapping of textSourceMap.mappings()) mapping.columnNumber += prefix.length;
+  }
 
   return textSourceMap;
 };
