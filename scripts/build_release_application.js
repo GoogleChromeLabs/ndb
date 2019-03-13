@@ -48,7 +48,7 @@ class ReleaseBuilder {
       'sdk_test_runner': 'SDKTestRunner',
       'cpu_profiler_test_runner': 'CPUProfilerTestRunner'
     };
-    this._images = new Set();
+    this._images = new Set(['popoverArrows.png']);
   }
 
   async _copyFile(source, destination) {
