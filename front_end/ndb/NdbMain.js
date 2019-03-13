@@ -40,7 +40,6 @@ Ndb.NdbMain = class extends Common.Object {
 
     this._repl();
 
-    Runtime.experiments.setEnabled('timelineTracingJSProfile', false);
     if (Common.moduleSetting('autoStartMain').get()) {
       const main = await Ndb.mainConfiguration();
       if (main)
