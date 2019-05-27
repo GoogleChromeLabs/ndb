@@ -5,9 +5,10 @@
  */
 
 Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
-  constructor(fsService, searchService, manager, rootPath, rootURL) {
+  constructor(fsService, fsIOService, searchService, manager, rootPath, rootURL) {
     super(rootURL, '');
     this._fsService = fsService;
+    this._fsIOService = fsIOService;
     this._searchService = searchService;
     this._rootURL = rootURL;
     this._embedderPath = rootPath;
@@ -15,21 +16,20 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
 
     /** @type {!Array<string>} */
     this._initialFilePaths = [];
-    /** @type {!Array<string>} */
-    this._initialGitFolders = [];
   }
 
   static async create(manager, rootPath, rootURL) {
     const searchClient = new Ndb.FileSystem.SearchClient();
-    const [fsService, searchService] = await Promise.all([
+    const [fsService, fsIOService, searchService] = await Promise.all([
       Ndb.backend.createService('file_system.js'),
+      Ndb.backend.createService('file_system_io.js'),
       Ndb.backend.createService('search.js', rpc.handle(searchClient))]);
 
     // TODO: fix PlatformFileSystem upstream, entire search / indexing pipeline should go
     // through the platform filesystem. This should make searchClient also go away.
     InspectorFrontendHost.stopIndexing = searchService.stopIndexing.bind(searchService);
 
-    const fs = new Ndb.FileSystem(fsService, searchService, manager, rootPath, rootURL);
+    const fs = new Ndb.FileSystem(fsService, fsIOService, searchService, manager, rootPath, rootURL);
     await fs._initFilePaths();
     return fs;
   }
@@ -47,10 +47,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    * @return {!Promise}
    */
   async _initFilePaths() {
-    await this._fsService.startWatcher(this._embedderPath, rpc.handle(this));
-    const result = await this._fsService.filePaths(this._rootURL, this._excludePattern());
-    this._initialFilePaths = result.filePaths;
-    this._initialGitFolders = result.gitFolders;
+    await this._fsService.startWatcher(this._embedderPath, this._excludePattern(), rpc.handle(this));
   }
 
   /**
@@ -66,7 +63,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    * @return {!Array<string>}
    */
   initialGitFolders() {
-    return this._initialGitFolders;
+    return [];
   }
 
   /**
@@ -94,7 +91,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    * @param {function(?string,boolean)} callback
    */
   async requestFileContent(path, callback) {
-    const result = await this._fsService.readFile(this._rootURL + path, 'base64');
+    const result = await this._fsIOService.readFile(this._rootURL + path, 'base64');
     const content = await(await fetch(`data:application/octet-stream;base64,${result}`)).text();
     callback(content, false);
   }
@@ -106,7 +103,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    * @param {boolean} isBase64
    */
   async setFileContent(path, content, isBase64) {
-    await this._fsService.writeFile(this._rootURL + path, isBase64 ? content : content.toBase64(), 'base64');
+    await this._fsIOService.writeFile(this._rootURL + path, isBase64 ? content : content.toBase64(), 'base64');
   }
 
   /**
@@ -117,7 +114,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    */
   async createFile(path, name) {
     // TODO(ak239): we should decide where to do substr here or on backend side.
-    const result = await this._fsService.createFile(this._rootURL + (path.length === 0 || path.startsWith('/') ? '' : '/') + path);
+    const result = await this._fsIOService.createFile(this._rootURL + (path.length === 0 || path.startsWith('/') ? '' : '/') + path);
     return result.substr(this._rootURL.length + 1);
   }
 
@@ -127,7 +124,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    * @return {!Promise<boolean>}
    */
   async deleteFile(path) {
-    return await this._fsService.deleteFile(this._rootURL + path);
+    return await this._fsIOService.deleteFile(this._rootURL + path);
   }
 
   /**
@@ -137,7 +134,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    * @param {function(boolean, string=)} callback
    */
   async renameFile(path, newName, callback) {
-    const result = await this._fsService.renameFile(this._rootURL + path, newName);
+    const result = await this._fsIOService.renameFile(this._rootURL + path, newName);
     callback(result, result ? newName : null);
   }
 

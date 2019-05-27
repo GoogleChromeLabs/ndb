@@ -24,7 +24,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "carlo": "^0.9.41",
-    "chokidar": "^2.0.4",
+    "chokidar": "^3.0.0",
     "isbinaryfile": "^3.0.3",
     "mime": "^2.3.1",
     "opn": "^5.3.0",
