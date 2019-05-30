@@ -216,8 +216,10 @@ Ndb.NodeProcessManager = class extends Common.Object {
   disconnected(sessionId) {
     this._processes.delete(sessionId);
     const target = this._targetManager.targetById(sessionId);
-    if (target)
+    if (target) {
       this._targetManager.removeTarget(target);
+      target.dispose();
+    }
   }
 
   dispatchMessage(message) {
