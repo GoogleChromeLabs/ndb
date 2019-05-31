@@ -1,6 +1,7 @@
 # ndb
 
 <!-- [START badges] -->
+[![Build Status](https://img.shields.io/travis/com/GoogleChromeLabs/ndb/master.svg)](https://travis-ci.com/GoogleChromeLabs/ndb)
 [![NPM ndb package](https://img.shields.io/npm/v/ndb.svg)](https://npmjs.org/package/ndb)
 <!-- [END badges] -->
 
