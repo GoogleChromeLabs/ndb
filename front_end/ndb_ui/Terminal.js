@@ -51,7 +51,7 @@ Ndb.Terminal = class extends UI.VBox {
     const contextMenu = new UI.ContextMenu(event);
     const copyItem = contextMenu.defaultSection().appendItem(ls`Copy`, () => navigator.clipboard.writeText(selection));
     copyItem.setEnabled(!!selection);
-    contextMenu.defaultSection().appendItem(ls`Paste`, async () => {
+    contextMenu.defaultSection().appendItem(ls`Paste`, async() => {
       if (this._backend)
         this._backend.write(await navigator.clipboard.readText());
     });

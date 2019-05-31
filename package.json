@@ -18,6 +18,7 @@
     "unit": "./node_modules/mocha/bin/mocha test/test.js",
     "integration": "node test/integration.js",
     "test-platform": "node test/platform.spec.js",
+    "test": "npm run lint",
     "debug": "node debug.js"
   },
   "author": "The Chromium Authors",
