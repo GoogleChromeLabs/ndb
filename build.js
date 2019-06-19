@@ -16,8 +16,7 @@ const DEVTOOLS_DIR = path.dirname(
       ['ndb', 'heap_snapshot_worker', 'formatter_worker'], [
         path.join(__dirname, 'front_end'),
         DEVTOOLS_DIR,
-        __dirname,
-        path.join(__dirname, '..', '..')
+        path.join(__dirname, 'node_modules'),
       ], outFolder,
       minifyJS);
 })();

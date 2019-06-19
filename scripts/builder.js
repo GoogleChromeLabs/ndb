@@ -130,7 +130,7 @@ async function loadModule(pathFolders, moduleName, customLoadModuleSource) {
   async function loadResource(pathFolders, moduleName, name) {
     const resource = await loadSource(pathFolders, moduleName, name);
     const content = resource.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/'/g, '\\\'');
-    return `Runtime.cachedResources['${moduleName + '/' + name}'] = '${content}';`;
+    return `Runtime.cachedResources['${moduleName}/${name}'] = '${content}';`;
   }
 }
 
@@ -187,6 +187,8 @@ async function loadSource(pathFolders, ...fileNameParts) {
 async function loadRawModule(pathFolders, ...fileNameParts) {
   const paths = lookupFile(pathFolders, ...fileNameParts);
   const sources = await Promise.all(paths.map(name => fs.readFile(name, 'utf8')));
+  if (paths.length > 1)
+    console.error('Module ' + fileNameParts[0] + ' overriden');
   const descriptors = sources.map(data => JSON.parse(data)).reverse();
   const descriptor = {
     dependencies: [],
@@ -196,18 +198,7 @@ async function loadRawModule(pathFolders, ...fileNameParts) {
     experiment: '',
     ...descriptors[0]
   };
-  for (let i = 1; i < descriptors.length; ++i) {
-    descriptor.dependencies.push(...(descriptors[i].dependencies || []));
-    descriptor.scripts.push(...(descriptors[i].scripts || []));
-    descriptor.resources.push(...(descriptors[i].resources || []));
-    descriptor.extensions.push(...(descriptors[i].extensions || []));
-    if (descriptors[i].experiment)
-      console.log('It is not possible to override experiment of builtin module');
-  }
-  return {
-    descriptor,
-    paths
-  };
+  return { descriptor, paths: [path[0]] };
 }
 
 /**

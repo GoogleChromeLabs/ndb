@@ -35,7 +35,7 @@
     "xterm": "^3.11.0"
   },
   "optionalDependencies": {
-    "ndb-node-pty-prebuilt": "^0.8.0"
+    "node-pty": "^0.9.0-beta18"
   },
   "devDependencies": {
     "chrome-devtools-frontend": "1.0.640176",
