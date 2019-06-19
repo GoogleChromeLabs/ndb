@@ -27,17 +27,14 @@
           "location": "sources.sidebar-top"
       }
   ],
-  "dependencies": ["ui", "sources", "timeline", "ndb"],
+  "dependencies": ["ui", "sources", "timeline", "ndb", "xterm"],
   "scripts": [
       "RunConfiguration.js",
       "NodeProcesses.js",
-      "../node_modules/xterm/dist/xterm.js",
-      "../node_modules/xterm/dist/addons/fit/fit.js",
       "Terminal.js"
   ],
   "resources": [
       "runConfiguration.css",
-      "nodeProcesses.css",
-      "../node_modules/xterm/dist/xterm.css"
+      "nodeProcesses.css"
   ]
 }

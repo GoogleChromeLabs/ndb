@@ -52,7 +52,7 @@ class Terminal {
 
 function init(frontend, nddStore, cols, rows) {
   try {
-    const pty = require('ndb-node-pty-prebuilt');
+    const pty = require('node-pty');
     return rpc.handle(new Terminal(frontend, pty, nddStore, cols, rows));
   } catch (e) {
     frontend.initFailed(e.stack);

@@ -9,7 +9,7 @@ Terminal.applyAddon(fit);
 Ndb.Terminal = class extends UI.VBox {
   constructor() {
     super(true);
-    this.registerRequiredCSS('node_modules/xterm/dist/xterm.css');
+    this.registerRequiredCSS('xterm/dist/xterm.css');
     this.element.addEventListener('contextmenu', this._onContextMenu.bind(this));
   }
 

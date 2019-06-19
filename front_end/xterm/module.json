@@ -1,0 +1,9 @@
+{
+  "scripts": [
+      "dist/xterm.js",
+      "dist/addons/fit/fit.js"
+  ],
+  "resources": [
+      "dist/xterm.css"
+  ]
+}

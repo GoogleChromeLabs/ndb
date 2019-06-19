@@ -6,7 +6,8 @@
      { "name": "timeline" },
      { "name": "product_registry" },
      { "name": "mobile_throttling" },
-     { "name": "ndb_ui" }
+     { "name": "ndb_ui" },
+     { "name": "xterm" }
  ],
   "extends": "shell",
   "has_html": true
