@@ -38,7 +38,7 @@
     "node-pty": "^0.9.0-beta18"
   },
   "devDependencies": {
-    "chrome-devtools-frontend": "1.0.640176",
+    "chrome-devtools-frontend": "1.0.670533",
     "eslint": "^5.9.0",
     "mocha": "^5.2.0",
     "rimraf": "^2.6.2",
