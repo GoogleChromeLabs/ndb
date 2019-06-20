@@ -248,11 +248,13 @@ async function buildApp(appNames, pathFolders, outFolder, minifyJS = code => cod
         notAutoStartModules.add(module.name);
     });
 
+    const appScript = await loadSource(pathFolders, appName + '.js');
+
     let scriptContent = '';
     scriptContent += '/* Runtime.js */\n' + runtime + '\n';
     scriptContent += `allDescriptors.push(...${JSON.stringify(moduleDescriptors)});\n`;
     scriptContent += `applicationDescriptor = ${JSON.stringify(appDescriptor)};\n`;
-    scriptContent += `Runtime.startApplication('${appName}');\n`;
+    scriptContent += appScript;
     const visitedModule = new Set();
     for (const [, module] of autoStartModulesByName)
       scriptContent += writeModule(modules, module, autoStartModulesByName, visitedModule);
