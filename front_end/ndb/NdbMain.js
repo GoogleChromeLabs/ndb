@@ -31,20 +31,23 @@ Ndb.NdbMain = class extends Common.Object {
 
     const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
     setting.set(Ndb.NdbMain._defaultExcludePattern().join('|'));
-    Ndb.nodeProcessManager = new Ndb.NodeProcessManager(SDK.targetManager);
+    Ndb.nodeProcessManager = await Ndb.NodeProcessManager.create(SDK.targetManager);
     this._addDefaultFileSystem();
 
     await new Promise(resolve => SDK.initMainConnection(resolve));
     // Create root Main target.
     SDK.targetManager.createTarget('<root>', ls`Root`, SDK.Target.Type.Browser, null);
 
-    this._repl();
-
     if (Common.moduleSetting('autoStartMain').get()) {
       const main = await Ndb.mainConfiguration();
-      if (main)
-        Ndb.nodeProcessManager.debug(main.execPath, main.args);
+      if (main) {
+        if (main.prof)
+          await Ndb.nodeProcessManager.profile(main.execPath, main.args);
+        else
+          Ndb.nodeProcessManager.debug(main.execPath, main.args);
+      }
     }
+    this._repl();
   }
 
   async _addDefaultFileSystem() {
@@ -103,6 +106,11 @@ Ndb.mainConfiguration = async() => {
     return null;
   let execPath;
   let args;
+  let prof = false;
+  if (cmd[0] === '--prof') {
+    prof = true;
+    cmd.shift();
+  }
   if (cmd[0].endsWith('.js')
     || cmd[0].endsWith('.mjs')
     || cmd[0].startsWith('-')) {
@@ -116,7 +124,8 @@ Ndb.mainConfiguration = async() => {
     name: 'main',
     command: cmd.join(' '),
     execPath,
-    args
+    args,
+    prof
   };
 };
 
@@ -146,21 +155,30 @@ Ndb.ContextMenuProvider = class {
 };
 
 Ndb.NodeProcessManager = class extends Common.Object {
-  constructor(targetManager) {
+  constructor(targetManager, service) {
     super();
-    this._servicePromise = null;
+    this._service = service;
     this._processes = new Map();
     this._lastDebugId = 0;
     this._lastStarted = null;
     this._targetManager = targetManager;
     this._cwds = new Map();
+    this._isProfiling = false;
+    this._cpuProfiles = [];
     this._targetManager.addModelListener(
         SDK.RuntimeModel, SDK.RuntimeModel.Events.ExecutionContextDestroyed, this._onExecutionContextDestroyed, this);
+    InspectorFrontendHost.sendMessageToBackend = this._sendMesage.bind(this);
+  }
+
+  static async create(targetManager) {
+    const service = await Ndb.backend.createService('ndd_service.js');
+    const manager = new Ndb.NodeProcessManager(targetManager, service);
+    await service.init(rpc.handle(manager));
+    return manager;
   }
 
   async nddStore() {
-    const service = await this._service();
-    return service.nddStore();
+    return this._service.nddStore();
   }
 
   infoForTarget(target) {
@@ -255,51 +273,70 @@ Ndb.NodeProcessManager = class extends Common.Object {
   }
 
   async _sendMesage(message) {
-    const service = await this._service();
-    return service.sendMessage(message);
-  }
-
-  _service() {
-    if (!this._servicePromise) {
-      async function service() {
-        const service = await Ndb.backend.createService('ndd_service.js');
-        await service.init(rpc.handle(this));
-        InspectorFrontendHost.sendMessageToBackend = this._sendMesage.bind(this);
-        return service;
-      }
-      this._servicePromise = service.call(this);
-    }
-    return this._servicePromise;
+    return this._service.sendMessage(message);
   }
 
   async _onExecutionContextDestroyed(event) {
     const executionContext = event.data;
-    const mainContextId = 1;
-    if (executionContext.id !== mainContextId)
+    if (!executionContext.isDefault)
       return;
     const target = executionContext.target();
-    if (target.suspended()) {
-      const debuggerModel = target.model(SDK.DebuggerModel);
-      await new Promise(resolve => debuggerModel.addEventListener(
-          SDK.DebuggerModel.Events.DebuggerWasEnabled, resolve));
+    if (this._isProfiling) {
+      this._cpuProfiles.push({
+        profile: await target.model(SDK.CPUProfilerModel).stopRecording(),
+        name: target.name(),
+        id: target.id()
+      });
     }
-    const service = await this._service();
-    service.disconnect(target.id());
+    await this._service.disconnect(target.id());
   }
 
   async debug(execPath, args, options) {
     options = options || {};
-    const service = await this._service();
     const debugId = options.data || String(++this._lastDebugId);
-    this._lastStarted = {execPath, args, debugId};
+    if (!options.data)
+      this._lastStarted = {execPath, args, debugId, isProfiling: this._isProfiling};
 
     const {cwd} = await Ndb.processInfo();
-    return service.debug(
+    return this._service.debug(
         execPath, args, {
           ...options,
           data: debugId,
           cwd: cwd,
         });
+  }
+
+  async profile(execPath, args, options) {
+    await UI.viewManager.showView('timeline');
+    const action = UI.actionRegistry.action('timeline.toggle-recording');
+    await action.execute();
+    this._isProfiling = true;
+    await this.debug(execPath, args);
+    this._isProfiling = false;
+    this._cpuProfiles.push(...await Promise.all(SDK.targetManager.models(SDK.CPUProfilerModel).map(async profiler => ({
+      profile: await profiler.stopRecording(),
+      name: profiler.target().name(),
+      id: profiler.target().id()
+    }))));
+    const controller = Timeline.TimelinePanel.instance()._controller;
+    controller.traceEventsCollected([{
+      cat: SDK.TracingModel.DevToolsMetadataEventCategory,
+      name: TimelineModel.TimelineModel.DevToolsMetadataEvent.TracingStartedInPage,
+      ph: 'M', pid: 1, tid: this._cpuProfiles[0].id, ts: 0,
+      args: {data: {sessionId: 1}}
+    }]);
+    for (const {profile, name, id} of this._cpuProfiles) {
+      controller.traceEventsCollected([{
+        cat: SDK.TracingModel.DevToolsMetadataEventCategory,
+        name: TimelineModel.TimelineModel.DevToolsMetadataEvent.TracingSessionIdForWorker,
+        ph: 'M', pid: 1, tid: id, ts: 0,
+        args: {data: {sessionId: 1, workerThreadId: id, workerId: id, url: name}}
+      }]);
+      controller.traceEventsCollected(TimelineModel.TimelineJSProfileProcessor.buildTraceProfileFromCpuProfile(
+          profile, id, false, TimelineModel.TimelineModel.WorkerThreadName));
+    }
+    this._cpuProfiles = [];
+    await action.execute();
   }
 
   async kill(target) {
@@ -316,8 +353,11 @@ Ndb.NodeProcessManager = class extends Common.Object {
         .map(target => target.runtimeAgent().invoke_evaluate({
           expression: `'${this._lastStarted.debugId}' === process.env.NDD_DATA && process.exit(-1)`
         })));
-    const {execPath, args} = this._lastStarted;
-    await this.debug(execPath, args);
+    const {execPath, args, isProfiling} = this._lastStarted;
+    if (!isProfiling)
+      await this.debug(execPath, args);
+    else
+      await this.profile(execPath, args);
   }
 };
 
