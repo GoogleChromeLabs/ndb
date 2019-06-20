@@ -16,7 +16,6 @@ if (!fs.existsSync(nddStoreDir))
   fs.mkdirSync(nddStoreDir);
 
 process.env.NDD_STORE = nddStoreDir;
-process.env.NDD_WAIT_FOR_CONNECTION = 1;
 let options = process.env.NODE_OPTIONS || '';
 if (!options.includes('ndb/inspect-brk'))
   options += ' -r ndb/inspect-brk';
