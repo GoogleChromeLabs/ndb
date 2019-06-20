@@ -12,7 +12,6 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 const util = require('util');
-const url = require('url');
 const WebSocket = require('ws');
 
 const NDB_VERSION = require('../package.json').version;
@@ -72,18 +71,13 @@ class NddService {
 
   async _onAdded(nddStore, id) {
     try {
-      const info = JSON.parse(await fsReadFile(path.join(nddStore, id), 'utf8'));
-      const targetInfo = (await this._fetch(info.targetListUrl))[0];
-      let webSocketDebuggerUrl = targetInfo.webSocketDebuggerUrl;
-      if (!webSocketDebuggerUrl) {
-        const wsUrl = url.parse(info.wsUrl);
-        wsUrl.pathname = '/' + targetInfo.id;
-        webSocketDebuggerUrl = url.format(wsUrl);
-      }
+      const targetListUrl = await fsReadFile(path.join(nddStore, id), 'utf8');
+      const targetInfo = (await this._fetch(targetListUrl))[0];
+      const webSocketDebuggerUrl = targetInfo.webSocketDebuggerUrl;
       const ws = new WebSocket(webSocketDebuggerUrl);
       ws.once('open', () => {
         this._sockets.set(id, ws);
-        this._frontend.detected({...info, id}, rpc.handle(this));
+        this._frontend.detected(id, rpc.handle(this));
       });
       ws.on('message', rawMessage => {
         const message = JSON.parse(rawMessage);
@@ -152,7 +146,6 @@ class NddService {
       NODE_OPTIONS: `--require ndb/preload.js`,
       NODE_PATH: nodePath,
       NDD_STORE: this._nddStores[0],
-      NDD_WAIT_FOR_CONNECTION: 1,
       NDB_VERSION
     };
     if (options && options.data)
@@ -181,14 +174,6 @@ class NddService {
       p.on('exit', code => resolve(code));
       p.on('error', error => reject(error));
     }).then(_ => fs.unlink(path.join(this._nddStores[0], String(p.pid)), err => 0));
-  }
-
-  kill(id) {
-    if (!this._running.has(id))
-      return;
-    process.kill(id, 'SIGINT');
-    for (const nddStore of this._nddStores)
-      fs.unlink(path.join(nddStore, id), _ => 0);
   }
 
   sendMessage(rawMessage) {

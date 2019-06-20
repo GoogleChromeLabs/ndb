@@ -28,7 +28,6 @@ class Terminal {
         ...process.env,
         NODE_OPTIONS: `--require ndb/preload.js`,
         NDD_STORE: nddStore,
-        NDD_WAIT_FOR_CONNECTION: 1,
         NODE_PATH: nodePath,
         NDB_VERSION
       }

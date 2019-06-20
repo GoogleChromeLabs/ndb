@@ -181,35 +181,59 @@ Ndb.NodeProcessManager = class extends Common.Object {
     return promise;
   }
 
-  async detected(payload) {
-    const pid = payload.id;
-    const processInfo = new Ndb.ProcessInfo(payload);
-    this._processes.set(pid, processInfo);
-
-    await this.addFileSystem(processInfo.cwd());
-    const parentTarget = (payload.ppid ? this._targetManager.targetById(payload.ppid) || this._targetManager.mainTarget() : this._targetManager.mainTarget());
+  async detected(id) {
+    let processInfoReceived;
+    this._processes.set(id, new Promise(resolve => processInfoReceived = resolve));
     const target = this._targetManager.createTarget(
-        pid, processInfo.userFriendlyName(), SDK.Target.Type.Node,
-        parentTarget, pid);
-    if (!processInfo.isRepl() && shouldPauseAtStart(payload.argv)) {
-      target.runtimeAgent().invoke_evaluate({
-        expression: `process.breakAtStart && process.breakAtStart()`,
-        includeCommandLineAPI: true
-      });
+        id, '', SDK.Target.Type.Node,
+        this._targetManager.mainTarget(), id);
+    const result = await target.runtimeAgent().invoke_evaluate({
+      expression: `(${fetchProcessInfo.toString()})()`,
+      includeCommandLineAPI: true,
+      returnByValue: true
+    });
+    const info = result.result.value;
+    const processInfo = new Ndb.ProcessInfo(info);
+    target.setInspectedURL('http://ndb/' + processInfo.userFriendlyName());
+    const runtimeModel = target.model(SDK.RuntimeModel);
+    const executionContext = runtimeModel && runtimeModel.defaultExecutionContext();
+    if (executionContext) {
+      executionContext.setLabel(processInfo.userFriendlyName());
+      UI.context.setFlavor(SDK.ExecutionContext, executionContext);
     }
+
+    await this.addFileSystem(info.cwd);
+    processInfoReceived(processInfo);
+
+    if (info.scriptName) {
+      const scriptURL = Common.ParsedURL.platformPathToURL(info.scriptName);
+      const uiSourceCode = Workspace.workspace.uiSourceCodeForURL(scriptURL);
+      if (uiSourceCode) {
+        if (Common.moduleSetting('pauseAtStart').get() && !Bindings.blackboxManager.isBlackboxedURL(scriptURL, false))
+          Bindings.breakpointManager.setBreakpoint(uiSourceCode, 0, 0, '', true);
+        else
+          Common.Revealer.reveal(uiSourceCode);
+      }
+    }
+
     return target.runtimeAgent().runIfWaitingForDebugger();
 
-    function shouldPauseAtStart(argv) {
-      if (argv.find(arg => arg.endsWith('ndb/inspect-brk')))
-        return true;
-      if (!Common.moduleSetting('pauseAtStart').get())
-        return false;
-      const [_, arg] = argv;
-      if (arg && (arg.endsWith('/bin/npm') || arg.endsWith('\\bin\\npm') ||
-          arg.endsWith('/bin/yarn') || arg.endsWith('\\bin\\yarn') ||
-          arg.endsWith('/bin/npm-cli.js') || arg.endsWith('\\bin\\npm-cli.js')))
-        return false;
-      return true;
+    function fetchProcessInfo() {
+      let scriptName = '';
+      try {
+        scriptName = require.resolve(process.argv[1]);
+      } catch (e) {
+      }
+      const ppid = process.env.NDD_PPID;
+      process.env.NDD_PPID = process.pid;
+      process.versions['ndb'] = process.env.NDB_VERSION;
+      return {
+        cwd: process.cwd(),
+        argv: process.argv.concat(process.execArgv),
+        data: process.env.NDD_DATA,
+        ppid: ppid,
+        scriptName: scriptName
+      };
     }
   }
 
@@ -268,32 +292,30 @@ Ndb.NodeProcessManager = class extends Common.Object {
     const service = await this._service();
     const debugId = options.data || String(++this._lastDebugId);
     this._lastStarted = {execPath, args, debugId};
-    const info = await Ndb.processInfo();
+
+    const {cwd} = await Ndb.processInfo();
     return service.debug(
         execPath, args, {
           ...options,
           data: debugId,
-          cwd: info.cwd,
+          cwd: cwd,
         });
   }
 
   async kill(target) {
-    const service = await this._service();
-    return service.kill(target.id());
+    return target.runtimeAgent().invoke_evaluate({
+      expression: 'process.exit(-1)'
+    });
   }
 
   async restartLast() {
     if (!this._lastStarted)
       return;
-    const promises = [];
-    for (const target of SDK.targetManager.targets()) {
-      const info = this.infoForTarget(target);
-      if (!info)
-        continue;
-      if (info.data() === this._lastStarted.debugId)
-        promises.push(this.kill(target));
-    }
-    await Promise.all(promises);
+    await Promise.all(SDK.targetManager.targets()
+        .filter(target => target.id() !== '<root>')
+        .map(target => target.runtimeAgent().invoke_evaluate({
+          expression: `'${this._lastStarted.debugId}' === process.env.NDD_DATA && process.exit(-1)`
+        })));
     const {execPath, args} = this._lastStarted;
     await this.debug(execPath, args);
   }
@@ -302,8 +324,8 @@ Ndb.NodeProcessManager = class extends Common.Object {
 Ndb.ProcessInfo = class {
   constructor(payload) {
     this._argv = payload.argv;
-    this._cwd = payload.cwd;
     this._data = payload.data;
+    this._ppid = payload.ppid;
     this._isRepl = payload.data === 'ndb/repl';
   }
 
@@ -315,8 +337,8 @@ Ndb.ProcessInfo = class {
     return this._data;
   }
 
-  cwd() {
-    return this._cwd;
+  ppid() {
+    return this._ppid;
   }
 
   userFriendlyName() {

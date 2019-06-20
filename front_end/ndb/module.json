@@ -7,7 +7,7 @@
         {
             "type": "setting",
             "category": "Debugger",
-            "title": "Pause node app on start",
+            "title": "Set breakpoint at first line",
             "settingName": "pauseAtStart",
             "settingType": "boolean",
             "defaultValue": false

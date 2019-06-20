@@ -17,8 +17,7 @@ Ndb.NodeProcesses = class extends UI.VBox {
 
     const toolbar = new UI.Toolbar('process-toolbar', this.contentElement);
     this._pauseAtStartCheckbox = new UI.ToolbarSettingCheckbox(
-        Common.moduleSetting('pauseAtStart'), Common.UIString('Pause at start'),
-        Common.UIString('Pause at start'));
+        Common.moduleSetting('pauseAtStart'));
     this._pauseAtStartCheckbox.element.id = 'pause-at-start-checkbox';
     toolbar.appendToolbarItem(this._pauseAtStartCheckbox);
 
@@ -32,6 +31,9 @@ Ndb.NodeProcesses = class extends UI.VBox {
     this._treeOutline.element.classList.add('hidden');
 
     this._targetToUI = new Map();
+
+    SDK.targetManager.addModelListener(
+        SDK.RuntimeModel, SDK.RuntimeModel.Events.ExecutionContextChanged, this._onExecutionContextChanged, this);
     SDK.targetManager.observeTargets(this);
   }
 
@@ -42,12 +44,14 @@ Ndb.NodeProcesses = class extends UI.VBox {
   async targetAdded(target) {
     if (target.id() === '<root>')
       return;
-    const processInfo = Ndb.nodeProcessManager.infoForTarget(target);
+    const processInfo = await Ndb.nodeProcessManager.infoForTarget(target);
     if (!processInfo || processInfo.isRepl())
       return;
+    const runtimeModel = target.model(SDK.RuntimeModel);
+    const executionContext = runtimeModel && runtimeModel.defaultExecutionContext();
     const f = UI.Fragment.build`
       <div class=process-item>
-        <div class=process-title>${processInfo.userFriendlyName()}</div>
+        <div $=title class=process-title>${executionContext ? executionContext.label() : 'node'}</div>
         <div $=state class=process-item-state></div>
       </div>
       <div class='controls-container fill'>
@@ -76,9 +80,10 @@ Ndb.NodeProcesses = class extends UI.VBox {
         UI.context.setFlavor(SDK.Target, target);
     };
 
+    const parentTarget = processInfo.ppid() ? SDK.targetManager.targetById(processInfo.ppid()) : null;
     let parentTreeElement = this._treeOutline.rootElement();
-    if (target.parentTarget()) {
-      const parentUI = this._targetToUI.get(target.parentTarget());
+    if (parentTarget) {
+      const parentUI = this._targetToUI.get(parentTarget);
       if (parentUI)
         parentTreeElement = parentUI.treeElement;
     }
@@ -117,5 +122,13 @@ Ndb.NodeProcesses = class extends UI.VBox {
     const treeElement = this._targetToUI.get(target);
     if (treeElement)
       treeElement.select();
+  }
+
+  _onExecutionContextChanged({data: executionContext}) {
+    if (executionContext.isDefault) {
+      const ui = this._targetToUI.get(executionContext.target());
+      if (ui)
+        ui.f.$('title').textContent = executionContext.label();
+    }
   }
 };
