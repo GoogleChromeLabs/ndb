@@ -81,8 +81,14 @@ ndb .
 # In Sources panel > "NPM Scripts" sidebar, click the selected "Run" button 
 ```
 
+- Use `Ctrl`/`Cmd` + `R` to restart last run
 - Run any node command from within ndb's integrated terminal and ndb will connect automatically
 - Run any open script source by using 'Run this script' context menu item, ndb will connect automatically as well
+
+- Use `--prof` flag to profile your app, `Ctrl`/`Cmd` + `R` restarts profiling
+```bash
+ndb --prof npm run unit
+```
 
 ## What can I do?
 

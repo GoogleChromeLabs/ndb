@@ -70,11 +70,7 @@ Ndb.RunConfiguration = class extends UI.VBox {
   }
 
   async _profileConfig(execPath, args) {
-    await UI.viewManager.showView('timeline');
-    await Common.console.showPromise();
-    const action = UI.actionRegistry.action('timeline.toggle-recording');
-    await action.execute();
-    await this._runConfig(execPath || await this._npmExecPath(), args);
+    await Ndb.nodeProcessManager.profile(execPath || await this._npmExecPath(), args);
   }
 
   /**
