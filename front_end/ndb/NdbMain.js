@@ -221,19 +221,23 @@ Ndb.NodeProcessManager = class extends Common.Object {
     }
 
     await this.addFileSystem(info.cwd);
-    processInfoReceived(processInfo);
-
     if (info.scriptName) {
       const scriptURL = Common.ParsedURL.platformPathToURL(info.scriptName);
       const uiSourceCode = Workspace.workspace.uiSourceCodeForURL(scriptURL);
+      const isBlackboxed = Bindings.blackboxManager.isBlackboxedURL(scriptURL, false);
+      if ((isBlackboxed || !uiSourceCode)) {
+        await target.runtimeAgent().runIfWaitingForDebugger();
+        return this._service.disconnect(target.id());
+      }
       if (uiSourceCode) {
-        if (Common.moduleSetting('pauseAtStart').get() && !Bindings.blackboxManager.isBlackboxedURL(scriptURL, false))
+        if (Common.moduleSetting('pauseAtStart').get() && !isBlackboxed)
           Bindings.breakpointManager.setBreakpoint(uiSourceCode, 0, 0, '', true);
         else
           Common.Revealer.reveal(uiSourceCode);
       }
     }
 
+    processInfoReceived(processInfo);
     return target.runtimeAgent().runIfWaitingForDebugger();
 
     function fetchProcessInfo() {
