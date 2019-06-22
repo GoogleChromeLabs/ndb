@@ -17,8 +17,17 @@
     callback(prefs);
   };
 
-  InspectorFrontendHost.isHostedMode = _ => false;
+  InspectorFrontendHost.isHostedMode = () => false;
   InspectorFrontendHost.copyText = text => navigator.clipboard.writeText(text);
   InspectorFrontendHost.openInNewTab = url => Ndb.backend.openInNewTab(url);
   InspectorFrontendHost.bringToFront = () => Ndb.backend.bringToFront();
+  InspectorFrontendHost.loadNetworkResource = async(url, headers, streamId, callback) => {
+    const text = await Ndb.backend.loadNetworkResource(url, headers);
+    if (text) {
+      Host.ResourceLoader.streamWrite(streamId, text);
+      callback({statusCode: 200});
+    } else {
+      callback({statusCode: 404});
+    }
+  };
 })();
