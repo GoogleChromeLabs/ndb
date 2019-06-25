@@ -1,3 +1,5 @@
+const fs = require('fs');
+
 const { rpc, rpc_process } = require('carlo/rpc');
 const chokidar = require('chokidar');
 
@@ -5,9 +7,13 @@ class FileSystemHandler {
   constructor() {
     require('../lib/process_utility.js')('file_system', () => this.dispose());
     this._watcher = null;
+    this._embedderPath = '';
+    this._client = null;
   }
 
-  startWatcher(embedderPath, exludePattern, client) {
+  startWatcher(embedderPath, exludePattern, client, mainFileName) {
+    this._embedderPath = embedderPath;
+    this._client = client;
     this._watcher = chokidar.watch([embedderPath], {
       ignored: new RegExp(exludePattern),
       awaitWriteFinish: true,
@@ -25,6 +31,11 @@ class FileSystemHandler {
       }
     });
     this._watcher.on('error', console.error);
+  }
+
+  forceFileLoad(fileName) {
+    if (fileName.startsWith(this._embedderPath) && fs.existsSync(fileName))
+      this._client.filesChanged([{type: 'add', name: fileName}]);
   }
 
   dispose() {
