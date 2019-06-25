@@ -50,6 +50,10 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
     await this._fsService.startWatcher(this._embedderPath, this._excludePattern(), rpc.handle(this));
   }
 
+  forceFileLoad(scriptName) {
+    return this._fsService.forceFileLoad(scriptName);
+  }
+
   /**
    * @override
    * @return {!Array<string>}

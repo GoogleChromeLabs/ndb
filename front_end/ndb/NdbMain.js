@@ -32,7 +32,9 @@ Ndb.NdbMain = class extends Common.Object {
     const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
     setting.set(Ndb.NdbMain._defaultExcludePattern().join('|'));
     Ndb.nodeProcessManager = await Ndb.NodeProcessManager.create(SDK.targetManager);
-    this._addDefaultFileSystem();
+
+    const {cwd} = await Ndb.processInfo();
+    await Ndb.nodeProcessManager.addFileSystem(cwd);
 
     await new Promise(resolve => SDK.initMainConnection(resolve));
     // Create root Main target.
@@ -48,11 +50,6 @@ Ndb.NdbMain = class extends Common.Object {
       }
     }
     this._repl();
-  }
-
-  async _addDefaultFileSystem() {
-    const info = await Ndb.processInfo();
-    await Ndb.nodeProcessManager.addFileSystem(info.cwd);
   }
 
   async _repl() {
@@ -185,18 +182,27 @@ Ndb.NodeProcessManager = class extends Common.Object {
     return this._processes.get(target.id()) || null;
   }
 
-  async addFileSystem(cwd) {
+  /**
+   * @param {string} cwd
+   * @param {string=} mainFileName
+   * @return {!Promise}
+   */
+  async addFileSystem(cwd, mainFileName) {
     let promise = this._cwds.get(cwd);
     if (!promise) {
       async function innerAdd() {
         const cwdUrl = Common.ParsedURL.platformPathToURL(cwd);
         const fileSystemManager = Persistence.isolatedFileSystemManager;
-        fileSystemManager.addPlatformFileSystem(cwdUrl, await Ndb.FileSystem.create(fileSystemManager, cwd, cwdUrl));
+        const fs = await Ndb.FileSystem.create(fileSystemManager, cwd, cwdUrl, mainFileName);
+        fileSystemManager.addPlatformFileSystem(cwdUrl, fs);
+        return fs;
       }
       promise = innerAdd();
       this._cwds.set(cwd, promise);
     }
-    return promise;
+    if (mainFileName)
+      await (await promise).forceFileLoad(mainFileName);
+    await promise;
   }
 
   async detected(id) {
@@ -220,7 +226,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
       UI.context.setFlavor(SDK.ExecutionContext, executionContext);
     }
 
-    await this.addFileSystem(info.cwd);
+    await this.addFileSystem(info.cwd, info.scriptName);
     if (info.scriptName) {
       const scriptURL = Common.ParsedURL.platformPathToURL(info.scriptName);
       const uiSourceCode = Workspace.workspace.uiSourceCodeForURL(scriptURL);
