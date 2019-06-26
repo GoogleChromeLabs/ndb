@@ -17,3 +17,4 @@ yarn.lock
 .eslintignore
 .eslintrc.js
 README.md
+ndb-*.tgz
