@@ -87,7 +87,7 @@ Ndb.NdbMain = class extends Common.Object {
 
   static _calculateBlackboxState() {
     const blackboxInternalScripts = Common.moduleSetting('blackboxInternalScripts').get();
-    const PATTERN = '^internal[\\/].*';
+    const PATTERN = '^internal[\\/].*|bin/npm-cli\.js$|bin/yarn\.js$';
     const regexPatterns = Common.moduleSetting('skipStackFramesPattern').getAsArray()
         .filter(({pattern}) => pattern !== PATTERN && pattern !== '^internal/.*');
     if (blackboxInternalScripts)
@@ -231,7 +231,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
       const scriptURL = Common.ParsedURL.platformPathToURL(info.scriptName);
       const uiSourceCode = Workspace.workspace.uiSourceCodeForURL(scriptURL);
       const isBlackboxed = Bindings.blackboxManager.isBlackboxedURL(scriptURL, false);
-      if ((isBlackboxed || !uiSourceCode)) {
+      if (isBlackboxed) {
         await target.runtimeAgent().runIfWaitingForDebugger();
         return this._service.disconnect(target.id());
       }
