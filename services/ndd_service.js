@@ -8,7 +8,6 @@ const { rpc, rpc_process } = require('carlo/rpc');
 const { spawn } = require('child_process');
 const chokidar = require('chokidar');
 const fs = require('fs');
-const http = require('http');
 const os = require('os');
 const path = require('path');
 const util = require('util');
@@ -71,9 +70,7 @@ class NddService {
 
   async _onAdded(nddStore, id) {
     try {
-      const targetListUrl = await fsReadFile(path.join(nddStore, id), 'utf8');
-      const targetInfo = (await this._fetch(targetListUrl))[0];
-      const webSocketDebuggerUrl = targetInfo.webSocketDebuggerUrl;
+      const webSocketDebuggerUrl = await fsReadFile(path.join(nddStore, id), 'utf8');
       const ws = new WebSocket(webSocketDebuggerUrl);
       ws.once('open', () => {
         this._sockets.set(id, ws);
@@ -91,28 +88,6 @@ class NddService {
       ws.once('error', () => 0);
     } catch (e) {
     }
-  }
-
-  _fetch(url) {
-    return new Promise(resolve => {
-      http.get(url, res => {
-        if (res.statusCode !== 200) {
-          res.resume();
-          resolve(null);
-        } else {
-          res.setEncoding('utf8');
-          let buffer = '';
-          res.on('data', data => buffer += data);
-          res.on('end', _ => {
-            try {
-              resolve(JSON.parse(buffer));
-            } catch (e) {
-              resolve(null);
-            }
-          });
-        }
-      }).on('error', _ => resolve(null));
-    });
   }
 
   async dispose() {

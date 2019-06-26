@@ -6,7 +6,7 @@
   "repository": "github:GoogleChromeLabs/ndb",
   "homepage": "https://github.com/GoogleChromeLabs/ndb#readme",
   "engines": {
-    "node": ">=8.0.0"
+    "node": ">=10.0.0"
   },
   "bin": {
     "ndb": "./ndb.js"
