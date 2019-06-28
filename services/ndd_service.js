@@ -71,13 +71,17 @@ class NddService {
 
   async _onAdded(nddStore, id) {
     try {
-      const targetListUrl = await fsReadFile(path.join(nddStore, id), 'utf8');
-      const targetInfo = (await this._fetch(targetListUrl))[0];
-      const webSocketDebuggerUrl = targetInfo.webSocketDebuggerUrl;
-      const ws = new WebSocket(webSocketDebuggerUrl);
+      const info = JSON.parse(await fsReadFile(path.join(nddStore, id), 'utf8'));
+      let inspectorUrl = info.inspectorUrl;
+      delete info.inspectorUrl;
+      if (inspectorUrl.startsWith('http:')) {
+        const targetInfo = (await this._fetch(inspectorUrl))[0];
+        inspectorUrl = targetInfo.webSocketDebuggerUrl;
+      }
+      const ws = new WebSocket(inspectorUrl);
       ws.once('open', () => {
         this._sockets.set(id, ws);
-        this._frontend.detected(id, rpc.handle(this));
+        this._frontend.detected(id, info);
       });
       ws.on('message', rawMessage => {
         const message = JSON.parse(rawMessage);
