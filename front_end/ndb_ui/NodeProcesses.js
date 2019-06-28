@@ -31,9 +31,6 @@ Ndb.NodeProcesses = class extends UI.VBox {
     this._treeOutline.element.classList.add('hidden');
 
     this._targetToUI = new Map();
-
-    SDK.targetManager.addModelListener(
-        SDK.RuntimeModel, SDK.RuntimeModel.Events.ExecutionContextChanged, this._onExecutionContextChanged, this);
     SDK.targetManager.observeTargets(this);
   }
 
@@ -47,11 +44,9 @@ Ndb.NodeProcesses = class extends UI.VBox {
     const processInfo = await Ndb.nodeProcessManager.infoForTarget(target);
     if (!processInfo || processInfo.isRepl())
       return;
-    const runtimeModel = target.model(SDK.RuntimeModel);
-    const executionContext = runtimeModel && runtimeModel.defaultExecutionContext();
     const f = UI.Fragment.build`
       <div class=process-item>
-        <div $=title class=process-title>${executionContext ? executionContext.label() : 'node'}</div>
+        <div class=process-title>${processInfo.userFriendlyName()}</div>
         <div $=state class=process-item-state></div>
       </div>
       <div class='controls-container fill'>
@@ -122,13 +117,5 @@ Ndb.NodeProcesses = class extends UI.VBox {
     const treeElement = this._targetToUI.get(target);
     if (treeElement)
       treeElement.select();
-  }
-
-  _onExecutionContextChanged({data: executionContext}) {
-    if (executionContext.isDefault) {
-      const ui = this._targetToUI.get(executionContext.target());
-      if (ui)
-        ui.f.$('title').textContent = executionContext.label();
-    }
   }
 };

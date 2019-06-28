@@ -205,27 +205,13 @@ Ndb.NodeProcessManager = class extends Common.Object {
     await promise;
   }
 
-  async detected(id) {
+  async detected(id, info) {
     let processInfoReceived;
     this._processes.set(id, new Promise(resolve => processInfoReceived = resolve));
-    const target = this._targetManager.createTarget(
-        id, '', SDK.Target.Type.Node,
-        this._targetManager.mainTarget(), id);
-    const result = await target.runtimeAgent().invoke_evaluate({
-      expression: `(${fetchProcessInfo.toString()})()`,
-      includeCommandLineAPI: true,
-      returnByValue: true
-    });
-    const info = result.result.value;
     const processInfo = new Ndb.ProcessInfo(info);
-    target.setInspectedURL('http://ndb/' + processInfo.userFriendlyName());
-    const runtimeModel = target.model(SDK.RuntimeModel);
-    const executionContext = runtimeModel && runtimeModel.defaultExecutionContext();
-    if (executionContext) {
-      executionContext.setLabel(processInfo.userFriendlyName());
-      UI.context.setFlavor(SDK.ExecutionContext, executionContext);
-    }
-
+    const target = this._targetManager.createTarget(
+        id, processInfo.userFriendlyName(), SDK.Target.Type.Node,
+        this._targetManager.mainTarget(), id);
     await this.addFileSystem(info.cwd, info.scriptName);
     if (info.scriptName) {
       const scriptURL = Common.ParsedURL.platformPathToURL(info.scriptName);
@@ -242,27 +228,8 @@ Ndb.NodeProcessManager = class extends Common.Object {
           Common.Revealer.reveal(uiSourceCode);
       }
     }
-
     processInfoReceived(processInfo);
     return target.runtimeAgent().runIfWaitingForDebugger();
-
-    function fetchProcessInfo() {
-      let scriptName = '';
-      try {
-        scriptName = require.resolve(process.argv[1]);
-      } catch (e) {
-      }
-      const ppid = process.env.NDD_PPID;
-      process.env.NDD_PPID = process.pid;
-      process.versions['ndb'] = process.env.NDB_VERSION;
-      return {
-        cwd: process.cwd(),
-        argv: process.argv.concat(process.execArgv),
-        data: process.env.NDD_DATA,
-        ppid: ppid,
-        scriptName: scriptName
-      };
-    }
   }
 
   disconnected(sessionId) {
