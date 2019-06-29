@@ -37,9 +37,7 @@ Ndb.NdbMain = class extends Common.Object {
     await Ndb.nodeProcessManager.addFileSystem(cwd);
 
     await new Promise(resolve => SDK.initMainConnection(resolve));
-    // Create root Main target.
     SDK.targetManager.createTarget('<root>', ls`Root`, SDK.Target.Type.Browser, null);
-
     if (Common.moduleSetting('autoStartMain').get()) {
       const main = await Ndb.mainConfiguration();
       if (main) {
@@ -49,19 +47,7 @@ Ndb.NdbMain = class extends Common.Object {
           Ndb.nodeProcessManager.debug(main.execPath, main.args);
       }
     }
-    this._repl();
-  }
-
-  async _repl() {
-    const code = btoa(`console.log('Welcome to the ndb %cR%cE%cP%cL%c!',
-      'color:#8bc34a', 'color:#ffc107', 'color:#ff5722', 'color:#2196f3', 'color:inherit');
-      process.title = 'ndb/repl';
-      setInterval(_ => 0, 2147483647)//# sourceURL=repl.js`);
-    const args = ['-e', `eval(Buffer.from('${code}', 'base64').toString())`];
-    const options = { ignoreOutput: true, data: 'ndb/repl' };
-    const node = await Ndb.nodeExecPath();
-    for (;;)
-      await Ndb.nodeProcessManager.debug(node, args, options);
+    Ndb.nodeProcessManager.startRepl();
   }
 
   static _defaultExcludePattern() {
@@ -152,34 +138,29 @@ Ndb.ContextMenuProvider = class {
 };
 
 Ndb.NodeProcessManager = class extends Common.Object {
-  constructor(targetManager, service) {
+  constructor(targetManager) {
     super();
-    this._service = service;
-    this._processes = new Map();
+    this._service = null;
     this._lastDebugId = 0;
     this._lastStarted = null;
     this._targetManager = targetManager;
     this._cwds = new Map();
-    this._isProfiling = false;
+    this._finishProfiling = null;
     this._cpuProfiles = [];
     this._targetManager.addModelListener(
         SDK.RuntimeModel, SDK.RuntimeModel.Events.ExecutionContextDestroyed, this._onExecutionContextDestroyed, this);
-    InspectorFrontendHost.sendMessageToBackend = this._sendMesage.bind(this);
   }
 
   static async create(targetManager) {
-    const service = await Ndb.backend.createService('ndd_service.js');
-    const manager = new Ndb.NodeProcessManager(targetManager, service);
-    await service.init(rpc.handle(manager));
+    const manager = new Ndb.NodeProcessManager(targetManager);
+    const service = await Ndb.backend.createService('ndd_service.js', rpc.handle(manager));
+    manager._service = service;
+    InspectorFrontendHost.sendMessageToBackend = service.sendMessage.bind(service);
     return manager;
   }
 
-  async nddStore() {
-    return this._service.nddStore();
-  }
-
-  infoForTarget(target) {
-    return this._processes.get(target.id()) || null;
+  env() {
+    return this._service.env();
   }
 
   /**
@@ -205,22 +186,17 @@ Ndb.NodeProcessManager = class extends Common.Object {
     await promise;
   }
 
-  async detected(id, info) {
-    let processInfoReceived;
-    this._processes.set(id, new Promise(resolve => processInfoReceived = resolve));
-    const processInfo = new Ndb.ProcessInfo(info);
+  async detected(info) {
     const target = this._targetManager.createTarget(
-        id, processInfo.userFriendlyName(), SDK.Target.Type.Node,
-        this._targetManager.mainTarget(), id);
+        info.id, userFriendlyName(info), SDK.Target.Type.Node,
+        this._targetManager.targetById(info.ppid) || this._targetManager.mainTarget(), info.id);
     await this.addFileSystem(info.cwd, info.scriptName);
     if (info.scriptName) {
       const scriptURL = Common.ParsedURL.platformPathToURL(info.scriptName);
       const uiSourceCode = Workspace.workspace.uiSourceCodeForURL(scriptURL);
       const isBlackboxed = Bindings.blackboxManager.isBlackboxedURL(scriptURL, false);
-      if (isBlackboxed) {
-        await target.runtimeAgent().runIfWaitingForDebugger();
+      if (isBlackboxed)
         return this._service.disconnect(target.id());
-      }
       if (uiSourceCode) {
         if (Common.moduleSetting('pauseAtStart').get() && !isBlackboxed)
           Bindings.breakpointManager.setBreakpoint(uiSourceCode, 0, 0, '', true);
@@ -228,12 +204,23 @@ Ndb.NodeProcessManager = class extends Common.Object {
           Common.Revealer.reveal(uiSourceCode);
       }
     }
-    processInfoReceived(processInfo);
-    return target.runtimeAgent().runIfWaitingForDebugger();
+    if (info.data === this._profilingNddData)
+      this._profiling.add(target.id());
+
+    function userFriendlyName(info) {
+      if (info.data === 'ndb/repl')
+        return 'repl';
+      return info.argv.map(arg => {
+        const index1 = arg.lastIndexOf('/');
+        const index2 = arg.lastIndexOf('\\');
+        if (index1 === -1 && index2 === -1)
+          return arg;
+        return arg.slice(Math.max(index1, index2) + 1);
+      }).join(' ');
+    }
   }
 
   disconnected(sessionId) {
-    this._processes.delete(sessionId);
     const target = this._targetManager.targetById(sessionId);
     if (target) {
       this._targetManager.removeTarget(target);
@@ -242,15 +229,9 @@ Ndb.NodeProcessManager = class extends Common.Object {
   }
 
   dispatchMessage(message) {
-    if (this._processes.has(message.sessionId)) {
-      InspectorFrontendHost.events.dispatchEventToListeners(
-          InspectorFrontendHostAPI.Events.DispatchMessage,
-          message);
-    }
-  }
-
-  async _sendMesage(message) {
-    return this._service.sendMessage(message);
+    InspectorFrontendHost.events.dispatchEventToListeners(
+        InspectorFrontendHostAPI.Events.DispatchMessage,
+        message);
   }
 
   async _onExecutionContextDestroyed(event) {
@@ -258,21 +239,38 @@ Ndb.NodeProcessManager = class extends Common.Object {
     if (!executionContext.isDefault)
       return;
     const target = executionContext.target();
-    if (this._isProfiling) {
+    if (target.name() === 'repl')
+      this.startRepl();
+    if (this._profiling && this._profiling.has(target.id())) {
       this._cpuProfiles.push({
         profile: await target.model(SDK.CPUProfilerModel).stopRecording(),
         name: target.name(),
         id: target.id()
       });
+      this._profiling.delete(target.id());
+      if (this._profiling.size === 0)
+        this._finishProfiling();
     }
     await this._service.disconnect(target.id());
+  }
+
+  async startRepl() {
+    const code = btoa(`console.log('Welcome to the ndb %cR%cE%cP%cL%c!',
+      'color:#8bc34a', 'color:#ffc107', 'color:#ff5722', 'color:#2196f3', 'color:inherit');
+      process.title = 'ndb/repl';
+      process.on('uncaughtException', console.error);
+      setInterval(_ => 0, 2147483647)//# sourceURL=repl.js`);
+    const args = ['-e', `eval(Buffer.from('${code}', 'base64').toString())`];
+    const options = { ignoreOutput: true, data: 'ndb/repl' };
+    const node = await Ndb.nodeExecPath();
+    return this.debug(node, args, options);
   }
 
   async debug(execPath, args, options) {
     options = options || {};
     const debugId = options.data || String(++this._lastDebugId);
     if (!options.data)
-      this._lastStarted = {execPath, args, debugId, isProfiling: this._isProfiling};
+      this._lastStarted = {execPath, args, debugId, isProfiling: !!this._finishProfiling};
 
     const {cwd} = await Ndb.processInfo();
     return this._service.debug(
@@ -287,14 +285,12 @@ Ndb.NodeProcessManager = class extends Common.Object {
     await UI.viewManager.showView('timeline');
     const action = UI.actionRegistry.action('timeline.toggle-recording');
     await action.execute();
-    this._isProfiling = true;
-    await this.debug(execPath, args);
-    this._isProfiling = false;
-    this._cpuProfiles.push(...await Promise.all(SDK.targetManager.models(SDK.CPUProfilerModel).map(async profiler => ({
-      profile: await profiler.stopRecording(),
-      name: profiler.target().name(),
-      id: profiler.target().id()
-    }))));
+    this._profilingNddData = String(++this._lastDebugId);
+    this._profiling = new Set();
+    this.debug(execPath, args, { data: this._profilingNddData });
+    await new Promise(resolve => this._finishProfiling = resolve);
+    this._profilingNddData = '';
+    await Promise.all(SDK.targetManager.models(SDK.CPUProfilerModel).map(profiler => profiler.stopRecording()));
     const controller = Timeline.TimelinePanel.instance()._controller;
     controller.traceEventsCollected([{
       cat: SDK.TracingModel.DevToolsMetadataEventCategory,
@@ -335,43 +331,6 @@ Ndb.NodeProcessManager = class extends Common.Object {
       await this.debug(execPath, args);
     else
       await this.profile(execPath, args);
-  }
-};
-
-Ndb.ProcessInfo = class {
-  constructor(payload) {
-    this._argv = payload.argv;
-    this._data = payload.data;
-    this._ppid = payload.ppid;
-    this._isRepl = payload.data === 'ndb/repl';
-  }
-
-  argv() {
-    return this._argv;
-  }
-
-  data() {
-    return this._data;
-  }
-
-  ppid() {
-    return this._ppid;
-  }
-
-  userFriendlyName() {
-    if (this._isRepl)
-      return 'repl';
-    return this.argv().map(arg => {
-      const index1 = arg.lastIndexOf('/');
-      const index2 = arg.lastIndexOf('\\');
-      if (index1 === -1 && index2 === -1)
-        return arg;
-      return arg.slice(Math.max(index1, index2) + 1);
-    }).join(' ');
-  }
-
-  isRepl() {
-    return this._isRepl;
   }
 };
 

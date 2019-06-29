@@ -38,15 +38,14 @@ Ndb.NodeProcesses = class extends UI.VBox {
    * @override
    * @param {!SDK.Target} target
    */
-  async targetAdded(target) {
+  targetAdded(target) {
     if (target.id() === '<root>')
       return;
-    const processInfo = await Ndb.nodeProcessManager.infoForTarget(target);
-    if (!processInfo || processInfo.isRepl())
+    if (target.name() === 'repl')
       return;
     const f = UI.Fragment.build`
       <div class=process-item>
-        <div class=process-title>${processInfo.userFriendlyName()}</div>
+        <div class=process-title>${target.name()}</div>
         <div $=state class=process-item-state></div>
       </div>
       <div class='controls-container fill'>
@@ -75,7 +74,7 @@ Ndb.NodeProcesses = class extends UI.VBox {
         UI.context.setFlavor(SDK.Target, target);
     };
 
-    const parentTarget = processInfo.ppid() ? SDK.targetManager.targetById(processInfo.ppid()) : null;
+    const parentTarget = target.parentTarget();
     let parentTreeElement = this._treeOutline.rootElement();
     if (parentTarget) {
       const parentUI = this._targetToUI.get(parentTarget);
