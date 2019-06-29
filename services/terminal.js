@@ -9,7 +9,7 @@ const path = require('path');
 const { rpc, rpc_process } = require('carlo/rpc');
 
 class Terminal {
-  constructor(frontend, pty, nddStore, cols, rows) {
+  constructor(frontend, pty, env, cols, rows) {
     require('../lib/process_utility.js')('terminal', () => this.dispose());
     let shell = process.env.SHELL;
     if (!shell || !fs.existsSync(shell))
@@ -26,10 +26,7 @@ class Terminal {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        NODE_OPTIONS: `--require ndb/preload.js`,
-        NDD_STORE: nddStore,
-        NODE_PATH: nodePath,
-        NDB_VERSION
+        ...env
       }
     });
     this._term.on('data', data => frontend.dataAdded(data));
@@ -49,10 +46,10 @@ class Terminal {
   }
 }
 
-function init(frontend, nddStore, cols, rows) {
+function init(frontend, env, cols, rows) {
   try {
     const pty = require('node-pty');
-    return rpc.handle(new Terminal(frontend, pty, nddStore, cols, rows));
+    return rpc.handle(new Terminal(frontend, pty, env, cols, rows));
   } catch (e) {
     frontend.initFailed(e.stack);
     process.exit(0);
