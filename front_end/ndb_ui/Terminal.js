@@ -41,6 +41,13 @@ Ndb.Terminal = class extends UI.VBox {
         env,
         this._terminal.cols,
         this._terminal.rows);
+    this._anotherTerminalHint(env);
+  }
+
+  _anotherTerminalHint(env) {
+    this._terminal.write('# Want to use your own terminal? Copy paste following lines..\r\n\r\n');
+    this._terminal.write(Object.keys(env).map(k => `export ${k}='${env[k]}'`).join('\r\n') + '\r\n\r\n');
+    this._terminal.write('# ..and after you can run any node program (e.g., npm run unit), ndb will detect it.\r\n\r\n');
   }
 
   /**
@@ -61,15 +68,18 @@ Ndb.Terminal = class extends UI.VBox {
   /**
    * @param {string} error
    */
-  initFailed(error) {
-    this.contentElement.removeChildren();
-    this.contentElement.createChild('div').textContent = error;
+  async initFailed(error) {
+    const env = await Ndb.nodeProcessManager.env();
+    this._terminal.write('# Builtin terminal is unvailable: ' + error.split('\n').join('\r\n#') + '\r\n\r\n');
+    this._anotherTerminalHint(env);
   }
 
   /**
    * @param {string} data
    */
   dataAdded(data) {
+    if (data.startsWith('Debugger listening on') || data.startsWith('Debugger attached.'))
+      return;
     this._terminal.write(data);
   }
 
