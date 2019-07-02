@@ -1,5 +1,6 @@
 {
   "modules" : [
+     { "name": "ndb_sdk", "type": "autostart" },
      { "name": "ndb", "type": "autostart" },
      { "name": "layer_viewer" },
      { "name": "timeline_model" },
