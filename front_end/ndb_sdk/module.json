@@ -1,0 +1,7 @@
+{
+    "dependencies": ["sdk"],
+    "scripts": [
+        "NodeRuntime.js",
+        "NodeWorker.js"
+    ]
+}

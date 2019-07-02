@@ -36,6 +36,10 @@ Ndb.NdbMain = class extends Common.Object {
     const {cwd} = await Ndb.processInfo();
     await Ndb.nodeProcessManager.addFileSystem(cwd);
 
+    // TODO(ak239): we do not want to create this model for workers, so we need a way to add custom capabilities.
+    SDK.SDKModel.register(NdbSdk.NodeWorkerModel, SDK.Target.Capability.JS, true);
+    SDK.SDKModel.register(NdbSdk.NodeRuntimeModel, SDK.Target.Capability.JS, true);
+
     await new Promise(resolve => SDK.initMainConnection(resolve));
     SDK.targetManager.createTarget('<root>', ls`Root`, SDK.Target.Type.Browser, null);
     if (Common.moduleSetting('autoStartMain').get()) {
@@ -151,6 +155,8 @@ Ndb.NodeProcessManager = class extends Common.Object {
     this._cpuProfiles = [];
     this._targetManager.addModelListener(
         SDK.RuntimeModel, SDK.RuntimeModel.Events.ExecutionContextDestroyed, this._onExecutionContextDestroyed, this);
+    this._targetManager.addModelListener(
+        NdbSdk.NodeRuntimeModel, NdbSdk.NodeRuntimeModel.Events.WaitingForDisconnect, this._onWaitingForDisconnect, this);
   }
 
   static async create(targetManager) {
@@ -191,7 +197,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
     const target = this._targetManager.createTarget(
         info.id, userFriendlyName(info), SDK.Target.Type.Node,
         this._targetManager.targetById(info.ppid) || this._targetManager.mainTarget(), undefined, false, connection);
-    target[Ndb._connectionSymbol] = connection;
+    target[NdbSdk.connectionSymbol] = connection;
     await this.addFileSystem(info.cwd, info.scriptName);
     if (info.scriptName) {
       const scriptURL = Common.ParsedURL.platformPathToURL(info.scriptName);
@@ -234,10 +240,14 @@ Ndb.NodeProcessManager = class extends Common.Object {
     const executionContext = event.data;
     if (!executionContext.isDefault)
       return;
-    const target = executionContext.target();
+    return this._onWaitingForDisconnect({data: executionContext.target()});
+  }
+
+  async _onWaitingForDisconnect(event) {
+    const target = event.data;
     if (target.name() === 'repl')
       this.startRepl();
-    if (this._profiling && this._profiling.has(target.id())) {
+    if (this._profiling && (this._profiling.has(target.id()) || this._profiling.has(target.parentTarget().id()))) {
       this._cpuProfiles.push({
         profile: await target.model(SDK.CPUProfilerModel).stopRecording(),
         name: target.name(),
@@ -247,7 +257,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
       if (this._profiling.size === 0)
         this._finishProfiling();
     }
-    const connection = target[Ndb._connectionSymbol];
+    const connection = target[NdbSdk.connectionSymbol];
     if (connection)
       await connection.disconnect();
   }
@@ -280,6 +290,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
   }
 
   async profile(execPath, args, options) {
+    // TODO(ak239): move it out here.
     await UI.viewManager.showView('timeline');
     const action = UI.actionRegistry.action('timeline.toggle-recording');
     await action.execute();
@@ -290,10 +301,11 @@ Ndb.NodeProcessManager = class extends Common.Object {
     this._profilingNddData = '';
     await Promise.all(SDK.targetManager.models(SDK.CPUProfilerModel).map(profiler => profiler.stopRecording()));
     const controller = Timeline.TimelinePanel.instance()._controller;
+    const mainProfile = this._cpuProfiles.find(data => !data.id.includes('#'));
     controller.traceEventsCollected([{
       cat: SDK.TracingModel.DevToolsMetadataEventCategory,
       name: TimelineModel.TimelineModel.DevToolsMetadataEvent.TracingStartedInPage,
-      ph: 'M', pid: 1, tid: this._cpuProfiles[0].id, ts: 0,
+      ph: 'M', pid: 1, tid: mainProfile.id, ts: 0,
       args: {data: {sessionId: 1}}
     }]);
     for (const {profile, name, id} of this._cpuProfiles) {

@@ -109,7 +109,7 @@ class NddService {
     process.disconnect();
   }
 
-  async _startSession(info, frontend, resumeTarget) {
+  async _startSession(info, frontend) {
     const ws = new WebSocket(info.inspectorUrl);
     const openPromise = new Promise(resolve => ws.once('open', () => resolve(DebugState.WS_OPEN)));
     const errorPromise = new Promise(resolve => ws.once('error', () => resolve(DebugState.WS_ERROR)));
