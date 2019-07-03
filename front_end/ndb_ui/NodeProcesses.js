@@ -4,12 +4,6 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-UI.context.addFlavorChangeListener(SDK.DebuggerPausedDetails, _ => {
-  const details = UI.context.flavor(SDK.DebuggerPausedDetails);
-  if (!details)
-    UI.context.setFlavor(SDK.DebuggerModel.CallFrame, null);
-});
-
 Ndb.NodeProcesses = class extends UI.VBox {
   constructor() {
     super(true);
@@ -60,7 +54,7 @@ Ndb.NodeProcesses = class extends UI.VBox {
     debuggerModel.addEventListener(SDK.DebuggerModel.Events.DebuggerResumed, () => {
       f.$('state').textContent = 'attached';
     });
-    f.$('state').textContent = 'attached';
+    f.$('state').textContent = debuggerModel.isPaused() ? 'paused' : 'attached';
 
     const buttons = f.$('controls-buttons');
     const toolbar = new UI.Toolbar('', buttons);
