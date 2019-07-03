@@ -38,11 +38,58 @@ const CALL_EXIT_MESSAGE = JSON.stringify({
   params: { expression: 'process.exit(-1)' }
 });
 
+class Channel {
+  /**
+   * @param {!WebSocket} ws
+   */
+  constructor(ws) {
+    this._ws = ws;
+    this._handler = null;
+    this._messageListener = this._messageReceived.bind(this);
+    this._ws.on('message', this._messageListener);
+  }
+
+  /**
+   * @param {string} message
+   */
+  send(message) {
+    if (this._ws.readyState === WebSocket.OPEN) {
+      protocolDebug('>', message);
+      this._ws.send(message);
+    }
+  }
+
+  close() {
+    this._ws.close();
+  }
+
+  /**
+   * @param {!Object}
+   */
+  listen(handler) {
+    this._handler = handler;
+  }
+
+  dispose() {
+    this._ws.removeListener('message', this._messageListener);
+  }
+
+  /**
+   * @param {string} message
+   */
+  _messageReceived(message) {
+    if (this._handler) {
+      protocolDebug('<', message);
+      this._handler.dispatchMessage(message);
+    }
+  }
+}
+
 class NddService {
   constructor(frontend) {
     process.title = 'ndb/ndd_service';
     this._disconnectPromise = new Promise(resolve => process.once('disconnect', () => resolve(DebugState.PROCESS_DISCONNECT)));
-    this._sockets = new Map();
+    this._connected = new Set();
 
     const pipePrefix = process.platform === 'win32' ? '\\\\.\\pipe\\' : os.tmpdir();
     const pipeName = `node-ndb.${process.pid}.sock`;
@@ -69,20 +116,14 @@ class NddService {
     const closePromise = new Promise(resolve => ws.once('close', () => resolve(DebugState.WS_CLOSE)));
     let state = await Promise.race([openPromise, errorPromise, closePromise, this._disconnectPromise]);
     if (state === DebugState.WS_OPEN) {
-      const messageListener = messageString => {
-        const message = JSON.parse(messageString);
-        message.sessionId = info.id;
-        protocolDebug('<', message);
-        frontend.dispatchMessage(message);
-      };
-      ws.on('message', messageListener);
-      this._sockets.set(info.id, ws);
-      state = await Promise.race([frontend.detected(info), this._disconnectPromise]);
+      this._connected.add(info.id);
+      const channel = new Channel(ws);
+      state = await Promise.race([frontend.detected(info, rpc.handle(channel)), this._disconnectPromise]);
       return async() => {
         if (state !== DebugState.PROCESS_DISCONNECT)
           state = await Promise.race([closePromise, errorPromise, this._disconnectPromise]);
-        ws.removeListener('message', messageListener);
-        this._sockets.delete(info.id);
+        channel.dispose();
+        this._connected.delete(info.id);
         if (state !== DebugState.PROCESS_DISCONNECT)
           frontend.disconnected(info.id);
         else
@@ -131,28 +172,12 @@ class NddService {
       p.once('error', resolve);
     });
     const result = await Promise.race([finishPromise, this._disconnectPromise]);
-    if (result === DebugState.PROCESS_DISCONNECT && !this._sockets.has(p.pid)) {
+    if (result === DebugState.PROCESS_DISCONNECT && !this._connected.has(p.pid)) {
       // The frontend can start the process but disconnects before it is
       // finished if it is blackboxed (e.g., npm process); in this case, we need
       // to kill this process here.
       p.kill();
     }
-  }
-
-  sendMessage(messageString) {
-    const message = JSON.parse(messageString);
-    const socket = this._sockets.get(message.sessionId);
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      delete message.sessionId;
-      protocolDebug('>', message);
-      socket.send(JSON.stringify(message));
-    }
-  }
-
-  disconnect(sessionId) {
-    const socket = this._sockets.get(sessionId);
-    if (socket)
-      socket.close();
   }
 }
 
