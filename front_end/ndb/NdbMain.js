@@ -137,6 +137,8 @@ Ndb.ContextMenuProvider = class {
   }
 };
 
+Ndb._connectionSymbol = Symbol('connection');
+
 Ndb.NodeProcessManager = class extends Common.Object {
   constructor(targetManager) {
     super();
@@ -153,9 +155,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
 
   static async create(targetManager) {
     const manager = new Ndb.NodeProcessManager(targetManager);
-    const service = await Ndb.backend.createService('ndd_service.js', rpc.handle(manager));
-    manager._service = service;
-    InspectorFrontendHost.sendMessageToBackend = service.sendMessage.bind(service);
+    manager._service = await Ndb.backend.createService('ndd_service.js', rpc.handle(manager));
     return manager;
   }
 
@@ -186,17 +186,19 @@ Ndb.NodeProcessManager = class extends Common.Object {
     await promise;
   }
 
-  async detected(info) {
+  async detected(info, channel) {
+    const connection = await Ndb.Connection.create(channel);
     const target = this._targetManager.createTarget(
         info.id, userFriendlyName(info), SDK.Target.Type.Node,
-        this._targetManager.targetById(info.ppid) || this._targetManager.mainTarget(), info.id);
+        this._targetManager.targetById(info.ppid) || this._targetManager.mainTarget(), undefined, false, connection);
+    target[Ndb._connectionSymbol] = connection;
     await this.addFileSystem(info.cwd, info.scriptName);
     if (info.scriptName) {
       const scriptURL = Common.ParsedURL.platformPathToURL(info.scriptName);
       const uiSourceCode = Workspace.workspace.uiSourceCodeForURL(scriptURL);
       const isBlackboxed = Bindings.blackboxManager.isBlackboxedURL(scriptURL, false);
       if (isBlackboxed)
-        return this._service.disconnect(target.id());
+        return connection.disconnect();
       if (uiSourceCode) {
         if (Common.moduleSetting('pauseAtStart').get() && !isBlackboxed)
           Bindings.breakpointManager.setBreakpoint(uiSourceCode, 0, 0, '', true);
@@ -228,12 +230,6 @@ Ndb.NodeProcessManager = class extends Common.Object {
     }
   }
 
-  dispatchMessage(message) {
-    InspectorFrontendHost.events.dispatchEventToListeners(
-        InspectorFrontendHostAPI.Events.DispatchMessage,
-        message);
-  }
-
   async _onExecutionContextDestroyed(event) {
     const executionContext = event.data;
     if (!executionContext.isDefault)
@@ -251,7 +247,9 @@ Ndb.NodeProcessManager = class extends Common.Object {
       if (this._profiling.size === 0)
         this._finishProfiling();
     }
-    await this._service.disconnect(target.id());
+    const connection = target[Ndb._connectionSymbol];
+    if (connection)
+      await connection.disconnect();
   }
 
   async startRepl() {
