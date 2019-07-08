@@ -14,8 +14,6 @@ const caughtErrorDebug = require('debug', 'ndd_service:caught');
 const { rpc, rpc_process } = require('carlo/rpc');
 const WebSocket = require('ws');
 
-const NDB_VERSION = require('../package.json').version;
-
 function silentRpcErrors(error) {
   if (!process.connected && error.code === 'ERR_IPC_CHANNEL_CLOSED')
     return;
@@ -137,10 +135,9 @@ class NddService {
 
   env() {
     return {
-      NODE_OPTIONS: `--require ndb/preload.js --inspect=0`,
+      NODE_OPTIONS: `--require ndb/preload.js`,
       NODE_PATH: `${process.env.NODE_PATH || ''}${path.delimiter}${path.join(__dirname, '..', 'lib', 'preload')}`,
-      NDD_IPC: this._pipe,
-      NDB_VERSION
+      NDD_IPC: this._pipe
     };
   }
 

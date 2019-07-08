@@ -5,7 +5,6 @@
  */
 
 const fs = require('fs');
-const path = require('path');
 const { rpc, rpc_process } = require('carlo/rpc');
 
 class Terminal {
@@ -14,11 +13,6 @@ class Terminal {
     let shell = process.env.SHELL;
     if (!shell || !fs.existsSync(shell))
       shell = process.platform === 'win32' ? 'cmd.exe' : 'bash';
-    const NDB_VERSION = require('../package.json').version;
-    let nodePath = process.env.NODE_PATH || '';
-    if (nodePath)
-      nodePath += process.platform === 'win32' ? ';' : ':';
-    nodePath += path.join(__dirname, '..', 'lib', 'preload');
     this._term = pty.spawn(shell, [], {
       name: 'xterm-color',
       cols: cols,
