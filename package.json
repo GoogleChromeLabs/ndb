@@ -14,12 +14,8 @@
   "scripts": {
     "lint": "./node_modules/.bin/eslint .",
     "prepare": "node build.js",
-    "dummyScriptForTest": "node -e 'console.log(239)'",
-    "unit": "./node_modules/mocha/bin/mocha test/test.js",
-    "integration": "node test/integration.js",
-    "test-platform": "node test/platform.spec.js",
     "test": "npm run lint",
-    "debug": "node debug.js"
+    "version": "node version.js && git add ./lib/preload/ndb/preload.js"
   },
   "author": "The Chromium Authors",
   "license": "Apache-2.0",
