@@ -46,13 +46,14 @@ class Terminal {
   }
 }
 
-function init(frontend, env, cols, rows) {
+async function init(frontend, env, cols, rows) {
   try {
     const pty = require('node-pty');
     return rpc.handle(new Terminal(frontend, pty, env, cols, rows));
   } catch (e) {
-    frontend.initFailed(e.stack);
-    process.exit(0);
+    await frontend.initFailed(e.stack);
+    setImmediate(() => process.exit(0));
+    return null;
   }
 }
 

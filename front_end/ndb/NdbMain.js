@@ -236,6 +236,14 @@ Ndb.NodeProcessManager = class extends Common.Object {
     }
   }
 
+  async terminalData(stream, data) {
+    const content = await(await fetch(`data:application/octet-stream;base64,${data}`)).text();
+    if (content.startsWith('Debugger listening on') || content.startsWith('Debugger attached.') || content.startsWith('Waiting for the debugger to disconnect...'))
+      return;
+    await Ndb.backend.writeTerminalData(stream, data);
+    this.dispatchEventToListeners(Ndb.NodeProcessManager.Events.TerminalData, content);
+  }
+
   async _onExecutionContextDestroyed(event) {
     const executionContext = event.data;
     if (!executionContext.isDefault)
@@ -342,6 +350,10 @@ Ndb.NodeProcessManager = class extends Common.Object {
     else
       await this.profile(execPath, args);
   }
+};
+
+Ndb.NodeProcessManager.Events = {
+  TerminalData: Symbol('terminalData')
 };
 
 /**

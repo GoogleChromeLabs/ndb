@@ -9,8 +9,13 @@ Terminal.applyAddon(fit);
 Ndb.Terminal = class extends UI.VBox {
   constructor() {
     super(true);
+    this._init = false;
     this.registerRequiredCSS('xterm/dist/xterm.css');
     this.element.addEventListener('contextmenu', this._onContextMenu.bind(this));
+    this._terminal = Ndb.Terminal._createTerminal();
+    this._terminal.on('resize', this._sendResize.bind(this));
+    this._terminal.on('data', this._sendData.bind(this));
+    Ndb.nodeProcessManager.addEventListener(Ndb.NodeProcessManager.Events.TerminalData, this._terminalData, this);
   }
 
   static _createTerminal() {
@@ -28,6 +33,7 @@ Ndb.Terminal = class extends UI.VBox {
     terminal.setOption('fontFamily', fontFamily);
     terminal.setOption('fontSize', fontSize);
     terminal.setOption('cursorStyle', 'bar');
+    terminal.setOption('convertEol', true);
     return terminal;
   }
 
@@ -35,19 +41,22 @@ Ndb.Terminal = class extends UI.VBox {
     if (this._backend)
       this._backend.dispose();
     const env = await Ndb.nodeProcessManager.env();
+    this._anotherTerminalHint(env);
     this._backend = await Ndb.backend.createService(
         'terminal.js',
         rpc.handle(this),
         env,
         this._terminal.cols,
         this._terminal.rows);
-    this._anotherTerminalHint(env);
   }
 
   _anotherTerminalHint(env) {
-    this._terminal.write('# Want to use your own terminal? Copy paste following lines..\r\n\r\n');
-    this._terminal.write(Object.keys(env).map(k => `export ${k}='${env[k]}'`).join('\r\n') + '\r\n\r\n');
-    this._terminal.write('# ..and after you can run any node program (e.g., npm run unit), ndb will detect it.\r\n\r\n');
+    this._terminal.writeln('# Want to use your own terminal? Copy paste following lines..');
+    this._terminal.writeln('');
+    this._terminal.writeln(Object.keys(env).map(k => `export ${k}='${env[k]}'`).join('\n'));
+    this._terminal.writeln('');
+    this._terminal.writeln('# ..and after you can run any node program (e.g., npm run unit), ndb will detect it.');
+    this._terminal.writeln('');
   }
 
   /**
@@ -69,16 +78,15 @@ Ndb.Terminal = class extends UI.VBox {
    * @param {string} error
    */
   async initFailed(error) {
-    const env = await Ndb.nodeProcessManager.env();
-    this._terminal.write('# Builtin terminal is unvailable: ' + error.split('\n').join('\r\n#') + '\r\n\r\n');
-    this._anotherTerminalHint(env);
+    this._terminal.write('# Builtin terminal is unvailable: ' + error.replace(/\n/g, '\n#'));
+    this._terminal.writeln('');
   }
 
   /**
    * @param {string} data
    */
   dataAdded(data) {
-    if (data.startsWith('Debugger listening on') || data.startsWith('Debugger attached.'))
+    if (data.startsWith('Debugger listening on') || data.startsWith('Debugger attached.') || data.startsWith('Waiting for the debugger to disconnect...'))
       return;
     this._terminal.write(data);
   }
@@ -107,13 +115,15 @@ Ndb.Terminal = class extends UI.VBox {
     this._terminal.fit();
   }
 
+  _terminalData(event) {
+    this._terminal.write(event.data);
+  }
+
   wasShown() {
-    if (this._terminal)
+    if (this._init)
       return;
-    this._terminal = Ndb.Terminal._createTerminal();
+    this._init = true;
     this._terminal.open(this.contentElement);
-    this._terminal.on('resize', this._sendResize.bind(this));
-    this._terminal.on('data', this._sendData.bind(this));
     this._restartService();
   }
 };

@@ -90,6 +90,7 @@ class NddService {
     process.title = 'ndb/ndd_service';
     this._disconnectPromise = new Promise(resolve => process.once('disconnect', () => resolve(DebugState.PROCESS_DISCONNECT)));
     this._connected = new Set();
+    this._frontend = frontend;
 
     const pipePrefix = process.platform === 'win32' ? '\\\\.\\pipe\\' : os.tmpdir();
     const pipeName = `node-ndb.${process.pid}.sock`;
@@ -150,21 +151,17 @@ class NddService {
     const p = spawn(execPath, args, {
       cwd: options.cwd,
       env: { ...process.env, ...env },
-      stdio: options.ignoreOutput ? 'ignore' : ['inherit', 'inherit', 'pipe'],
+      stdio: options.ignoreOutput ? 'ignore' : ['inherit', 'pipe', 'pipe'],
       windowsHide: true
     });
     if (!options.ignoreOutput) {
-      const filter = [
-        Buffer.from('Debugger listening on', 'utf8'),
-        Buffer.from('Waiting for the debugger to disconnect...', 'utf8'),
-        Buffer.from('Debugger attached.', 'utf8')
-      ];
       p.stderr.on('data', data => {
-        for (const prefix of filter) {
-          if (Buffer.compare(data.slice(0, prefix.length), prefix) === 0)
-            return;
-        }
-        process.stderr.write(data);
+        if (process.connected)
+          this._frontend.terminalData('stderr', data.toString('base64'));
+      });
+      p.stdout.on('data', data => {
+        if (process.connected)
+          this._frontend.terminalData('stdout', data.toString('base64'));
       });
     }
     const finishPromise = new Promise(resolve => {
