@@ -10,7 +10,6 @@ Ndb.RunConfiguration = class extends UI.VBox {
     this.registerRequiredCSS('ndb_ui/runConfiguration.css');
     this._items = new UI.ListModel();
     this._list = new UI.ListControl(this._items, this, UI.ListMode.NonViewport);
-    this._npmExecPathPromise = null;
     this.contentElement.appendChild(this._list.element);
     this.update();
   }
@@ -29,12 +28,6 @@ Ndb.RunConfiguration = class extends UI.VBox {
         args: ['run', name]
       }))));
     }
-  }
-
-  _npmExecPath() {
-    if (!this._npmExecPathPromise)
-      this._npmExecPathPromise = Ndb.backend.which('npm').then(result => result.resolvedPath);
-    return this._npmExecPathPromise;
   }
 
   /**
@@ -66,11 +59,11 @@ Ndb.RunConfiguration = class extends UI.VBox {
   }
 
   async _runConfig(execPath, args) {
-    await Ndb.nodeProcessManager.debug(execPath || await this._npmExecPath(), args);
+    await Ndb.nodeProcessManager.debug(execPath || await Ndb.npmExecPath(), args);
   }
 
   async _profileConfig(execPath, args) {
-    await Ndb.nodeProcessManager.profile(execPath || await this._npmExecPath(), args);
+    await Ndb.nodeProcessManager.profile(execPath || await Ndb.npmExecPath(), args);
   }
 
   /**
