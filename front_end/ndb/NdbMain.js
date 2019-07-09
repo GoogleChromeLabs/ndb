@@ -10,6 +10,12 @@ Ndb.nodeExecPath = function() {
   return Ndb._nodeExecPathPromise;
 };
 
+Ndb.npmExecPath = function() {
+  if (!Ndb._npmExecPathPromise)
+    Ndb._npmExecPathPromise = Ndb.backend.which('npm').then(result => result.resolvedPath);
+  return Ndb._npmExecPathPromise;
+};
+
 Ndb.processInfo = function() {
   if (!Ndb._processInfoPromise)
     Ndb._processInfoPromise = Ndb.backend.processInfo();
@@ -107,6 +113,10 @@ Ndb.mainConfiguration = async() => {
     execPath = cmd[0];
     args = cmd.slice(1);
   }
+  if (execPath === 'npm')
+    execPath = await Ndb.npmExecPath();
+  else if (execPath === 'node')
+    execPath = await Ndb.nodeExecPath();
   return {
     name: 'main',
     command: cmd.join(' '),
