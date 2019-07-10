@@ -1,20 +1,7 @@
 const fs = require('fs');
-const url = require('url');
 
 const { rpc, rpc_process } = require('carlo/rpc');
 const chokidar = require('chokidar');
-
-let pathToUrl;
-if (!url.pathToFileURL) {
-  // Node 8 does not convert file paths to file urls, so we do not need to
-  // polyfill pathToUrl here.
-  pathToUrl = str => str;
-} else {
-  pathToUrl = function(fileName) {
-    if (url.pathToFileURL)
-      return url.pathToFileURL(fileName).toString();
-  };
-}
 
 class FileSystemHandler {
   constructor() {
@@ -39,7 +26,7 @@ class FileSystemHandler {
           setTimeout(() => client.filesChanged(events.splice(0)), 100);
         events.push({
           type: event,
-          name: pathToUrl(name)
+          name: name
         });
       }
     });
@@ -48,7 +35,7 @@ class FileSystemHandler {
 
   forceFileLoad(fileName) {
     if (fileName.startsWith(this._embedderPath) && fs.existsSync(fileName))
-      this._client.filesChanged([{type: 'add', name: pathToUrl(fileName)}]);
+      this._client.filesChanged([{type: 'add', name: fileName}]);
   }
 
   dispose() {
