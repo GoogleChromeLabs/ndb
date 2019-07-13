@@ -1,15 +1,21 @@
 {
-  "modules" : [
-     { "name": "ndb_sdk", "type": "autostart" },
-     { "name": "ndb", "type": "autostart" },
-     { "name": "layer_viewer" },
-     { "name": "timeline_model" },
-     { "name": "timeline" },
-     { "name": "product_registry" },
-     { "name": "mobile_throttling" },
-     { "name": "ndb_ui" },
-     { "name": "xterm" }
- ],
+  "modules": [
+    { "name": "ndb_sdk", "type": "autostart" },
+    { "name": "ndb", "type": "autostart" },
+    { "name": "layer_viewer" },
+    { "name": "timeline_model" },
+    { "name": "timeline" },
+    { "name": "product_registry" },
+    { "name": "mobile_throttling" },
+    { "name": "ndb_ui" },
+    { "name": "xterm" },
+    { "name": "emulation", "type": "autostart" },
+    { "name": "inspector_main", "type": "autostart" },
+    { "name": "mobile_throttling", "type": "autostart" },
+    { "name": "cookie_table" },
+    { "name": "har_importer" },
+    { "name": "network" }
+  ],
   "extends": "shell",
   "has_html": true
 }

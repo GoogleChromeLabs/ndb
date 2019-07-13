@@ -52,7 +52,14 @@
             "className": "Ndb.ContextMenuProvider"
         }
     ],
-    "dependencies": ["common", "sdk", "ndb_sdk", "bindings", "persistence", "components"],
+    "dependencies": [
+        "common",
+        "sdk",
+        "ndb_sdk",
+        "bindings",
+        "persistence",
+        "components"
+    ],
     "scripts": [
         "InspectorFrontendHostOverrides.js",
         "Connection.js",

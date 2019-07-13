@@ -5,14 +5,20 @@
  */
 
 Ndb.nodeExecPath = function() {
-  if (!Ndb._nodeExecPathPromise)
-    Ndb._nodeExecPathPromise = Ndb.backend.which('node').then(result => result.resolvedPath);
+  if (!Ndb._nodeExecPathPromise) {
+    Ndb._nodeExecPathPromise = Ndb.backend
+        .which('node')
+        .then(result => result.resolvedPath);
+  }
   return Ndb._nodeExecPathPromise;
 };
 
 Ndb.npmExecPath = function() {
-  if (!Ndb._npmExecPathPromise)
-    Ndb._npmExecPathPromise = Ndb.backend.which('npm').then(result => result.resolvedPath);
+  if (!Ndb._npmExecPathPromise) {
+    Ndb._npmExecPathPromise = Ndb.backend
+        .which('npm')
+        .then(result => result.resolvedPath);
+  }
   return Ndb._npmExecPathPromise;
 };
 
@@ -27,38 +33,59 @@ Ndb.processInfo = function() {
  */
 Ndb.NdbMain = class extends Common.Object {
   /**
-   * @override
-   */
+     * @override
+     */
   async run() {
     InspectorFrontendAPI.setUseSoftMenu(true);
     document.title = 'ndb';
-    Common.moduleSetting('blackboxInternalScripts').addChangeListener(Ndb.NdbMain._calculateBlackboxState);
+    Common.moduleSetting('blackboxInternalScripts').addChangeListener(
+        Ndb.NdbMain._calculateBlackboxState
+    );
     Ndb.NdbMain._calculateBlackboxState();
 
     const setting = Persistence.isolatedFileSystemManager.workspaceFolderExcludePatternSetting();
     setting.set(Ndb.NdbMain._defaultExcludePattern().join('|'));
-    Ndb.nodeProcessManager = await Ndb.NodeProcessManager.create(SDK.targetManager);
+    Ndb.nodeProcessManager = await Ndb.NodeProcessManager.create(
+        SDK.targetManager
+    );
 
-    const {cwd} = await Ndb.processInfo();
+    const { cwd } = await Ndb.processInfo();
     await Ndb.nodeProcessManager.addFileSystem(cwd);
 
     // TODO(ak239): we do not want to create this model for workers, so we need a way to add custom capabilities.
-    SDK.SDKModel.register(NdbSdk.NodeWorkerModel, SDK.Target.Capability.JS, true);
-    SDK.SDKModel.register(NdbSdk.NodeRuntimeModel, SDK.Target.Capability.JS, true);
+    SDK.SDKModel.register(
+        NdbSdk.NodeWorkerModel,
+        SDK.Target.Capability.JS,
+        true
+    );
+    SDK.SDKModel.register(
+        NdbSdk.NodeRuntimeModel,
+        SDK.Target.Capability.JS,
+        true
+    );
 
     await new Promise(resolve => SDK.initMainConnection(resolve));
-    SDK.targetManager.createTarget('<root>', ls`Root`, SDK.Target.Type.Browser, null);
+    SDK.targetManager.createTarget(
+        '<root>',
+        ls`Root`,
+        SDK.Target.Type.Browser,
+        null
+    );
+
     if (Common.moduleSetting('autoStartMain').get()) {
       const main = await Ndb.mainConfiguration();
       if (main) {
-        if (main.prof)
-          await Ndb.nodeProcessManager.profile(main.execPath, main.args);
-        else
-          Ndb.nodeProcessManager.debug(main.execPath, main.args);
+        if (main.prof) {
+          await Ndb.nodeProcessManager.profile(
+              main.execPath,
+              main.args
+          );
+        } else {Ndb.nodeProcessManager.debug(main.execPath, main.args);}
       }
     }
     Ndb.nodeProcessManager.startRepl();
   }
+
 
   static _defaultExcludePattern() {
     const defaultCommonExcludedFolders = [
@@ -125,7 +152,6 @@ Ndb.mainConfiguration = async() => {
     prof
   };
 };
-
 /**
  * @implements {UI.ContextMenu.Provider}
  * @unrestricted
@@ -172,7 +198,19 @@ Ndb.NodeProcessManager = class extends Common.Object {
   static async create(targetManager) {
     const manager = new Ndb.NodeProcessManager(targetManager);
     manager._service = await Ndb.backend.createService('ndd_service.js', rpc.handle(manager));
+    InspectorFrontendHost.sendMessageToBackend = manager.sendMessageToBackend.bind(manager);
+
     return manager;
+  }
+
+  /**
+   * @param {object} message
+   *
+   * @return {Promise} void
+   */
+  async sendMessageToBackend(message) {
+    if (this._service && this._service.sendMessage)
+      return this._service.sendMessage(message);
   }
 
   env() {
@@ -244,6 +282,30 @@ Ndb.NodeProcessManager = class extends Common.Object {
       this._targetManager.removeTarget(target);
       target.dispose();
     }
+  }
+
+  sendLoadingFinished({ type, payload }) {
+    SDK._mainConnection._onMessage(JSON.stringify({
+      method: 'Network.loadingFinished',
+      params: payload
+    }));
+  }
+
+  responseToFrontEnd(id, result) {
+    InspectorFrontendHost.events.dispatchEventToListeners(
+        InspectorFrontendHostAPI.Events.DispatchMessage,
+        {
+          id,
+          result
+        }
+    );
+  }
+
+  sendNetworkData({ type, payload }) {
+    SDK._mainConnection._onMessage(JSON.stringify({
+      method: type,
+      params: payload
+    }));
   }
 
   async terminalData(stream, data) {
