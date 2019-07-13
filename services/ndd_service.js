@@ -95,8 +95,8 @@ class NddService {
     this._pipe = path.join(pipePrefix, pipeName);
     const server = net.createServer(socket => {
       socket.on('data', async d => {
-        const runSession = await this._startSession(JSON.parse(d), frontend);
-        socket.write('run');
+        const payload = Buffer.from(d.toString(), 'base64').toString();
+        const runSession = await this._startSession(JSON.parse(payload), frontend);
         runSession();
       });
       socket.on('error', e => caughtErrorDebug(e));
