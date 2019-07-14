@@ -238,6 +238,26 @@ Ndb.NodeProcessManager = class extends Common.Object {
         info.id, userFriendlyName(info), SDK.Target.Type.Node,
         this._targetManager.targetById(info.ppid) || this._targetManager.mainTarget(), undefined, false, connection);
     target[NdbSdk.connectionSymbol] = connection;
+
+    try {
+      // this doesnt work
+      // target.runtimeAgent().invoke_evaluate({
+      //   expression: `
+      //     const zlib = require('http');
+      //     console.log('foo');
+      //   `
+      // });
+      //
+      // but this does
+      // target.runtimeAgent().invoke_evaluate({
+      //   expression: `
+      //     console.log('foo');
+      //   `
+      // });
+    } catch(err) {
+      console.log(err);
+    }
+
     await this.addFileSystem(info.cwd, info.scriptName);
     if (info.scriptName) {
       const scriptURL = Common.ParsedURL.platformPathToURL(info.scriptName);
