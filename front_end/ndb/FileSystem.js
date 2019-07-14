@@ -95,8 +95,12 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    */
   async requestFileContent(path, callback) {
     const result = await this._fsIOService.readFile(this._rootURL + path, 'base64');
-    const content = await(await fetch(`data:application/octet-stream;base64,${result}`)).text();
-    callback(content, false);
+    if (this.contentType(path) === Common.resourceTypes.Image) {
+      callback(result, true);
+    } else {
+      const content = await(await fetch(`data:application/octet-stream;base64,${result}`)).text();
+      callback(content, false);
+    }
   }
 
   /**
