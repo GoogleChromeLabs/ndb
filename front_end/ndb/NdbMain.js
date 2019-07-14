@@ -172,14 +172,14 @@ Ndb.NodeProcessManager = class extends Common.Object {
   static async create(targetManager) {
     const manager = new Ndb.NodeProcessManager(targetManager);
     manager._service = await Ndb.backend.createService('ndd_service.js', rpc.handle(manager));
-    InspectorFrontendHost.sendMessageToBackend = manager.sendMessageToBackend.bind(manager);
+    // InspectorFrontendHost.sendMessageToBackend = manager.sendMessageToBackend.bind(manager);
     return manager;
   }
 
-  async sendMessageToBackend(message) {
-    if (this._service && this._service.sendMessage)
-      return this._service.sendMessage(message);
-  }
+  // async sendMessageToBackend(message) {
+  //   if (this._service && this._service.sendMessage)
+  //     return this._service.sendMessage(message);
+  // }
 
   sendLoadingFinished({ type, payload }) {
     SDK._mainConnection._onMessage(JSON.stringify({
@@ -243,6 +243,27 @@ Ndb.NodeProcessManager = class extends Common.Object {
       expression: await Ndb.backend.httpMonkeyPatchingSource(),
       includeCommandLineAPI: true
     });
+
+    setInterval(async() => {
+      const message = await target.runtimeAgent().invoke_evaluate({
+        expression: 'process._getNetworkMessages()',
+        awaitPromise: true
+      });
+
+      if (!message.result) return;
+      const arrMessages = JSON.parse(message.result.value);
+
+      for (const mes of arrMessages) {
+        const { type, payload } = mes;
+
+        if (type) {
+          SDK._mainConnection._onMessage(JSON.stringify({
+            method: type,
+            params: payload
+          }));
+        }
+      }
+    }, 200);
 
     await this.addFileSystem(info.cwd, info.scriptName);
     if (info.scriptName) {

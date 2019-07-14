@@ -143,13 +143,13 @@ class NddService {
     };
   }
 
-  sendMessage(rawMessage) {
-    const message = JSON.parse(rawMessage);
-    // send message to frontend directly
-    // (eg: getResponseBody)
-    const { base64Encoded, data } = catchedRequests[message.params.requestId];
-    this._frontend.responseToFrontEnd(message.id, { base64Encoded, body: data });
-  }
+  // sendMessage(rawMessage) {
+  //   const message = JSON.parse(rawMessage);
+  //   // send message to frontend directly
+  //   // (eg: getResponseBody)
+  //   const { base64Encoded, data } = catchedRequests[message.params.requestId];
+  //   this._frontend.responseToFrontEnd(message.id, { base64Encoded, body: data });
+  // }
 
   async debug(execPath, args, options) {
     const env = this.env();
