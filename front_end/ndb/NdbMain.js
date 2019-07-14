@@ -239,24 +239,10 @@ Ndb.NodeProcessManager = class extends Common.Object {
         this._targetManager.targetById(info.ppid) || this._targetManager.mainTarget(), undefined, false, connection);
     target[NdbSdk.connectionSymbol] = connection;
 
-    try {
-      // this doesnt work
-      // target.runtimeAgent().invoke_evaluate({
-      //   expression: `
-      //     const zlib = require('http');
-      //     console.log('foo');
-      //   `
-      // });
-      //
-      // but this does
-      // target.runtimeAgent().invoke_evaluate({
-      //   expression: `
-      //     console.log('foo');
-      //   `
-      // });
-    } catch(err) {
-      console.log(err);
-    }
+    target.runtimeAgent().invoke_evaluate({
+      expression: await Ndb.backend.httpMonkeyPatchingSource(),
+      includeCommandLineAPI: true
+    });
 
     await this.addFileSystem(info.cwd, info.scriptName);
     if (info.scriptName) {
