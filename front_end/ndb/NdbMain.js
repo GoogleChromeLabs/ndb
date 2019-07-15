@@ -175,35 +175,6 @@ Ndb.NodeProcessManager = class extends Common.Object {
     return manager;
   }
 
-  // async sendMessageToBackend(message) {
-  //   if (this._service && this._service.sendMessage)
-  //     return this._service.sendMessage(message);
-  // }
-
-  // sendLoadingFinished({ type, payload }) {
-  //   SDK._mainConnection._onMessage(JSON.stringify({
-  //     method: 'Network.loadingFinished',
-  //     params: payload
-  //   }));
-  // }
-//
-  // responseToFrontEnd(id, result) {
-  //   InspectorFrontendHost.events.dispatchEventToListeners(
-  //       InspectorFrontendHostAPI.Events.DispatchMessage,
-  //       {
-  //         id,
-  //         result
-  //       }
-  //   );
-  // }
-
-  // sendNetworkData({ type, payload }) {
-  //   SDK._mainConnection._onMessage(JSON.stringify({
-  //     method: type,
-  //     params: payload
-  //   }));
-  // }
-
   env() {
     return this._service.env();
   }

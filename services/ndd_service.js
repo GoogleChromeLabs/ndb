@@ -143,14 +143,6 @@ class NddService {
     };
   }
 
-  // sendMessage(rawMessage) {
-  //   const message = JSON.parse(rawMessage);
-  //   // send message to frontend directly
-  //   // (eg: getResponseBody)
-  //   const { base64Encoded, data } = catchedRequests[message.params.requestId];
-  //   this._frontend.responseToFrontEnd(message.id, { base64Encoded, body: data });
-  // }
-
   async debug(execPath, args, options) {
     const env = this.env();
     if (options.data)
@@ -163,11 +155,6 @@ class NddService {
       windowsHide: true
     });
     if (!options.ignoreOutput) {
-      // p.on('message', ({ type, payload }) => {
-      //   if (!(type && payload)) return;
-      //   catchedRequests[payload.id] = payload;
-      //   this._frontend.sendNetworkData({ type, payload });
-      // });
       p.stderr.on('data', data => {
         if (process.connected)
           this._frontend.terminalData('stderr', data.toString('base64'));
