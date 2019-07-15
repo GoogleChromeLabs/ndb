@@ -58,5 +58,25 @@
     }
   };
 
+  while (true) {
+    const message = await target.runtimeAgent().invoke_evaluate({
+      expression: 'process._getNetworkMessages()',
+      awaitPromise: true
+    });
+
+    if (!message.result) return;
+    const arrMessages = JSON.parse(message.result.value);
+
+    for (const mes of arrMessages) {
+      const { type, payload } = mes;
+
+      if (type) {
+        SDK._mainConnection._onMessage(JSON.stringify({
+          method: type,
+          params: payload
+        }));
+      }
+    }
+  }
 
 })();
