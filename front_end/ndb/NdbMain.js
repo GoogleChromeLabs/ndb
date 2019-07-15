@@ -214,27 +214,6 @@ Ndb.NodeProcessManager = class extends Common.Object {
       includeCommandLineAPI: true
     });
 
-    setInterval(async() => {
-      const message = await target.runtimeAgent().invoke_evaluate({
-        expression: 'process._getNetworkMessages()',
-        awaitPromise: true
-      });
-
-      if (!message.result) return;
-      const arrMessages = JSON.parse(message.result.value);
-
-      for (const mes of arrMessages) {
-        const { type, payload } = mes;
-
-        if (type) {
-          SDK._mainConnection._onMessage(JSON.stringify({
-            method: type,
-            params: payload
-          }));
-        }
-      }
-    }, 200);
-
     await this.addFileSystem(info.cwd, info.scriptName);
     if (info.scriptName) {
       const scriptURL = Common.ParsedURL.platformPathToURL(info.scriptName);
