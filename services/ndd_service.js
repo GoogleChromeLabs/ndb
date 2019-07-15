@@ -23,8 +23,6 @@ function silentRpcErrors(error) {
 process.on('uncaughtException', silentRpcErrors);
 process.on('unhandledRejection', silentRpcErrors);
 
-// const catchedRequests = {};
-
 const DebugState = {
   WS_OPEN: 1,
   WS_ERROR: 2,
@@ -147,11 +145,10 @@ class NddService {
     const env = this.env();
     if (options.data)
       env.NDD_DATA = options.data;
-
     const p = spawn(execPath, args, {
       cwd: options.cwd,
       env: { ...process.env, ...env },
-      stdio: options.ignoreOutput ? 'ignore' : ['pipe', 'pipe', 'pipe'],
+      stdio: options.ignoreOutput ? 'ignore' : ['inherit', 'pipe', 'pipe'],
       windowsHide: true
     });
     if (!options.ignoreOutput) {
