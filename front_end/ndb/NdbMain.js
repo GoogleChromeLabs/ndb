@@ -172,7 +172,6 @@ Ndb.NodeProcessManager = class extends Common.Object {
   static async create(targetManager) {
     const manager = new Ndb.NodeProcessManager(targetManager);
     manager._service = await Ndb.backend.createService('ndd_service.js', rpc.handle(manager));
-    // InspectorFrontendHost.sendMessageToBackend = manager.sendMessageToBackend.bind(manager);
     return manager;
   }
 
@@ -181,29 +180,29 @@ Ndb.NodeProcessManager = class extends Common.Object {
   //     return this._service.sendMessage(message);
   // }
 
-  sendLoadingFinished({ type, payload }) {
-    SDK._mainConnection._onMessage(JSON.stringify({
-      method: 'Network.loadingFinished',
-      params: payload
-    }));
-  }
+  // sendLoadingFinished({ type, payload }) {
+  //   SDK._mainConnection._onMessage(JSON.stringify({
+  //     method: 'Network.loadingFinished',
+  //     params: payload
+  //   }));
+  // }
+//
+  // responseToFrontEnd(id, result) {
+  //   InspectorFrontendHost.events.dispatchEventToListeners(
+  //       InspectorFrontendHostAPI.Events.DispatchMessage,
+  //       {
+  //         id,
+  //         result
+  //       }
+  //   );
+  // }
 
-  responseToFrontEnd(id, result) {
-    InspectorFrontendHost.events.dispatchEventToListeners(
-        InspectorFrontendHostAPI.Events.DispatchMessage,
-        {
-          id,
-          result
-        }
-    );
-  }
-
-  sendNetworkData({ type, payload }) {
-    SDK._mainConnection._onMessage(JSON.stringify({
-      method: type,
-      params: payload
-    }));
-  }
+  // sendNetworkData({ type, payload }) {
+  //   SDK._mainConnection._onMessage(JSON.stringify({
+  //     method: type,
+  //     params: payload
+  //   }));
+  // }
 
   env() {
     return this._service.env();

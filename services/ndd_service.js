@@ -23,7 +23,7 @@ function silentRpcErrors(error) {
 process.on('uncaughtException', silentRpcErrors);
 process.on('unhandledRejection', silentRpcErrors);
 
-const catchedRequests = {};
+// const catchedRequests = {};
 
 const DebugState = {
   WS_OPEN: 1,
@@ -159,15 +159,15 @@ class NddService {
     const p = spawn(execPath, args, {
       cwd: options.cwd,
       env: { ...process.env, ...env },
-      stdio: options.ignoreOutput ? ['ignore', 'ignore', 'ignore', 'ipc'] : ['pipe', 'pipe', 'pipe', 'ipc'],
+      stdio: options.ignoreOutput ? 'ignore' : ['pipe', 'pipe', 'pipe'],
       windowsHide: true
     });
     if (!options.ignoreOutput) {
-      p.on('message', ({ type, payload }) => {
-        if (!(type && payload)) return;
-        catchedRequests[payload.id] = payload;
-        this._frontend.sendNetworkData({ type, payload });
-      });
+      // p.on('message', ({ type, payload }) => {
+      //   if (!(type && payload)) return;
+      //   catchedRequests[payload.id] = payload;
+      //   this._frontend.sendNetworkData({ type, payload });
+      // });
       p.stderr.on('data', data => {
         if (process.connected)
           this._frontend.terminalData('stderr', data.toString('base64'));
