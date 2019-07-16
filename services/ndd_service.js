@@ -8,6 +8,7 @@ const { spawn } = require('child_process');
 const os = require('os');
 const path = require('path');
 const net = require('net');
+const { fileURLToPath } = require('../lib/filepath_to_url.js');
 
 const protocolDebug = require('debug')('ndd_service:protocol');
 const caughtErrorDebug = require('debug', 'ndd_service:caught');
@@ -146,7 +147,7 @@ class NddService {
     if (options.data)
       env.NDD_DATA = options.data;
     const p = spawn(execPath, args, {
-      cwd: options.cwd,
+      cwd: options.cwd ? fileURLToPath(options.cwd) : undefined,
       env: { ...process.env, ...env },
       stdio: options.ignoreOutput ? 'ignore' : ['inherit', 'pipe', 'pipe'],
       windowsHide: true

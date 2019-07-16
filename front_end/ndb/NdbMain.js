@@ -4,22 +4,10 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-Ndb.nodeExecPath = function() {
-  if (!Ndb._nodeExecPathPromise)
-    Ndb._nodeExecPathPromise = Ndb.backend.which('node').then(result => result.resolvedPath);
-  return Ndb._nodeExecPathPromise;
-};
-
 Ndb.npmExecPath = function() {
   if (!Ndb._npmExecPathPromise)
     Ndb._npmExecPathPromise = Ndb.backend.which('npm').then(result => result.resolvedPath);
   return Ndb._npmExecPathPromise;
-};
-
-Ndb.processInfo = function() {
-  if (!Ndb._processInfoPromise)
-    Ndb._processInfoPromise = Ndb.backend.processInfo();
-  return Ndb._processInfoPromise;
 };
 
 /**
@@ -39,8 +27,8 @@ Ndb.NdbMain = class extends Common.Object {
     setting.set(Ndb.NdbMain._defaultExcludePattern().join('|'));
     Ndb.nodeProcessManager = await Ndb.NodeProcessManager.create(SDK.targetManager);
 
-    const {cwd} = await Ndb.processInfo();
-    await Ndb.nodeProcessManager.addFileSystem(cwd);
+    Ndb.processInfo = await Ndb.backend.processInfo();
+    await Ndb.nodeProcessManager.addFileSystem(Ndb.processInfo.cwd);
 
     // TODO(ak239): we do not want to create this model for workers, so we need a way to add custom capabilities.
     SDK.SDKModel.register(NdbSdk.NodeWorkerModel, SDK.Target.Capability.JS, true);
@@ -93,7 +81,7 @@ Ndb.NdbMain = class extends Common.Object {
 };
 
 Ndb.mainConfiguration = async() => {
-  const info = await Ndb.processInfo();
+  const info = Ndb.processInfo;
   const cmd = info.argv.slice(2);
   if (cmd.length === 0 || cmd[0] === '.')
     return null;
@@ -107,7 +95,7 @@ Ndb.mainConfiguration = async() => {
   if (cmd[0].endsWith('.js')
     || cmd[0].endsWith('.mjs')
     || cmd[0].startsWith('-')) {
-    execPath = await Ndb.nodeExecPath();
+    execPath = await Ndb.processInfo.nodeExecPath;
     args = cmd;
   } else {
     execPath = cmd[0];
@@ -116,7 +104,7 @@ Ndb.mainConfiguration = async() => {
   if (execPath === 'npm')
     execPath = await Ndb.npmExecPath();
   else if (execPath === 'node')
-    execPath = await Ndb.nodeExecPath();
+    execPath = await Ndb.processInfo.nodeExecPath;
   return {
     name: 'main',
     command: cmd.join(' '),
@@ -144,9 +132,9 @@ Ndb.ContextMenuProvider = class {
     if (!url.startsWith('file://') || (!url.endsWith('.js') && !url.endsWith('.mjs')))
       return;
     contextMenu.debugSection().appendItem(ls`Run this script`, async() => {
-      const platformPath = Common.ParsedURL.urlToPlatformPath(url, Host.isWin());
+      const platformPath = await Ndb.backend.fileURLToPath(url);
       const args = url.endsWith('.mjs') ? ['--experimental-modules', platformPath] : [platformPath];
-      Ndb.nodeProcessManager.debug(await Ndb.nodeExecPath(), args);
+      Ndb.nodeProcessManager.debug(Ndb.processInfo.nodeExecPath, args);
     });
   }
 };
@@ -188,10 +176,9 @@ Ndb.NodeProcessManager = class extends Common.Object {
     let promise = this._cwds.get(cwd);
     if (!promise) {
       async function innerAdd() {
-        const cwdUrl = Common.ParsedURL.platformPathToURL(cwd);
         const fileSystemManager = Persistence.isolatedFileSystemManager;
-        const fs = await Ndb.FileSystem.create(fileSystemManager, cwd, cwdUrl, mainFileName);
-        fileSystemManager.addPlatformFileSystem(cwdUrl, fs);
+        const fs = await Ndb.FileSystem.create(fileSystemManager, cwd);
+        fileSystemManager.addPlatformFileSystem(cwd, fs);
         return fs;
       }
       promise = innerAdd();
@@ -210,7 +197,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
     target[NdbSdk.connectionSymbol] = connection;
     await this.addFileSystem(info.cwd, info.scriptName);
     if (info.scriptName) {
-      const scriptURL = Common.ParsedURL.platformPathToURL(info.scriptName);
+      const scriptURL = info.scriptName;
       const uiSourceCode = Workspace.workspace.uiSourceCodeForURL(scriptURL);
       const isBlackboxed = Bindings.blackboxManager.isBlackboxedURL(scriptURL, false);
       if (isBlackboxed)
@@ -288,7 +275,7 @@ Ndb.NodeProcessManager = class extends Common.Object {
       setInterval(_ => 0, 2147483647)//# sourceURL=repl.js`);
     const args = ['-e', `eval(Buffer.from('${code}', 'base64').toString())`];
     const options = { ignoreOutput: true, data: 'ndb/repl' };
-    const node = await Ndb.nodeExecPath();
+    const node = Ndb.processInfo.nodeExecPath;
     return this.debug(node, args, options);
   }
 
@@ -298,12 +285,11 @@ Ndb.NodeProcessManager = class extends Common.Object {
     if (!options.data)
       this._lastStarted = {execPath, args, debugId, isProfiling: !!this._finishProfiling};
 
-    const {cwd} = await Ndb.processInfo();
     return this._service.debug(
         execPath, args, {
           ...options,
           data: debugId,
-          cwd: cwd,
+          cwd: Ndb.processInfo.cwd
         });
   }
 

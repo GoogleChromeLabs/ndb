@@ -5,20 +5,19 @@
  */
 
 Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
-  constructor(fsService, fsIOService, searchService, manager, rootPath, rootURL) {
+  constructor(fsService, fsIOService, searchService, manager, rootURL) {
     super(rootURL, '');
     this._fsService = fsService;
     this._fsIOService = fsIOService;
     this._searchService = searchService;
     this._rootURL = rootURL;
-    this._embedderPath = rootPath;
     this._manager = manager;
 
     /** @type {!Array<string>} */
     this._initialFilePaths = [];
   }
 
-  static async create(manager, rootPath, rootURL) {
+  static async create(manager, rootURL) {
     const searchClient = new Ndb.FileSystem.SearchClient();
     const [fsService, fsIOService, searchService] = await Promise.all([
       Ndb.backend.createService('file_system.js'),
@@ -29,7 +28,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
     // through the platform filesystem. This should make searchClient also go away.
     InspectorFrontendHost.stopIndexing = searchService.stopIndexing.bind(searchService);
 
-    const fs = new Ndb.FileSystem(fsService, fsIOService, searchService, manager, rootPath, rootURL);
+    const fs = new Ndb.FileSystem(fsService, fsIOService, searchService, manager, rootURL);
     await fs._initFilePaths();
     return fs;
   }
@@ -39,7 +38,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    * @return {string}
    */
   embedderPath() {
-    return this._embedderPath;
+    throw new Error('Not implemented');
   }
 
   /**
@@ -47,7 +46,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    * @return {!Promise}
    */
   async _initFilePaths() {
-    await this._fsService.startWatcher(this._embedderPath, this._excludePattern(), rpc.handle(this));
+    await this._fsService.startWatcher(this._rootURL, this._excludePattern(), rpc.handle(this));
   }
 
   forceFileLoad(scriptName) {
@@ -117,7 +116,6 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    * @return {!Promise<?string>}
    */
   async createFile(path, name) {
-    // TODO(ak239): we should decide where to do substr here or on backend side.
     const result = await this._fsIOService.createFile(this._rootURL + (path.length === 0 || path.startsWith('/') ? '' : '/') + path);
     return result.substr(this._rootURL.length + 1);
   }
@@ -198,13 +196,13 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
   searchInPath(query, progress) {
     return new Promise(resolve => {
       const requestId = this._manager.registerCallback(innerCallback);
-      this._searchService.searchInPath(requestId, this._embedderPath, query);
+      this._searchService.searchInPath(requestId, this._rootURL, query);
 
       /**
        * @param {!Array<string>} files
        */
       function innerCallback(files) {
-        resolve(files.map(path => Common.ParsedURL.platformPathToURL(path)));
+        resolve(files);
         progress.worked(1);
       }
     });
@@ -216,7 +214,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
   filesChanged(events) {
     for (const event of events) {
       const paths = new Multimap();
-      paths.set(this._rootURL, Common.ParsedURL.platformPathToURL(event.name));
+      paths.set(this._rootURL, event.name);
       const emptyMap = new Multimap();
       Persistence.isolatedFileSystemManager.dispatchEventToListeners(Persistence.IsolatedFileSystemManager.Events.FileSystemFilesChanged, {
         changed: event.type === 'change' ? paths : emptyMap,
@@ -233,7 +231,7 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
   indexContent(progress) {
     progress.setTotalWork(1);
     const requestId = this._manager.registerProgress(progress);
-    this._searchService.indexPath(requestId, this._embedderPath, this._excludePattern());
+    this._searchService.indexPath(requestId, this._rootURL, this._excludePattern());
   }
 
   /**
