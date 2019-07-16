@@ -8,6 +8,8 @@ const { rpc, rpc_process } = require('carlo/rpc');
 const fs = require('fs');
 const path = require('path');
 
+const { fileURLToPath, pathToFileURL } = require('../lib/filepath_to_url.js');
+
 const isbinaryfile = require('isbinaryfile');
 
 // TODO(ak239): track changed files.
@@ -30,6 +32,7 @@ class SearchBackend {
    * @param {string} fileSystemPath
    */
   async indexPath(requestId, fileSystemPath, excludedPattern) {
+    fileSystemPath = fileURLToPath(fileSystemPath);
     const excludeRegex = new RegExp(excludedPattern);
     if (this._index.has(fileSystemPath)) {
       this._indexChangedFiles(requestId, fileSystemPath);
@@ -185,6 +188,7 @@ class SearchBackend {
    * @param {string} query
    */
   searchInPath(requestId, fileSystemPath, query) {
+    fileSystemPath = fileURLToPath(fileSystemPath);
     const index = this._index.get(fileSystemPath);
     let result = [];
     query = query.toLowerCase();
@@ -205,6 +209,7 @@ class SearchBackend {
       result = Array.from(resultSet);
     }
     result = result.map(index => this._indexToFileName.get(index));
+    result = result.map(result => pathToFileURL(result).toString());
     this._frontend.searchCompleted(requestId, fileSystemPath, result);
   }
 

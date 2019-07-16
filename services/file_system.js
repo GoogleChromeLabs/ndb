@@ -2,6 +2,7 @@ const fs = require('fs');
 
 const { rpc, rpc_process } = require('carlo/rpc');
 const chokidar = require('chokidar');
+const {pathToFileURL, fileURLToPath} = require('../lib/filepath_to_url.js');
 
 class FileSystemHandler {
   constructor() {
@@ -12,9 +13,9 @@ class FileSystemHandler {
   }
 
   startWatcher(embedderPath, exludePattern, client, mainFileName) {
-    this._embedderPath = embedderPath;
+    this._embedderPath = fileURLToPath(embedderPath);
     this._client = client;
-    this._watcher = chokidar.watch([embedderPath], {
+    this._watcher = chokidar.watch([this._embedderPath], {
       ignored: new RegExp(exludePattern),
       awaitWriteFinish: true,
       ignorePermissionErrors: true
@@ -26,16 +27,17 @@ class FileSystemHandler {
           setTimeout(() => client.filesChanged(events.splice(0)), 100);
         events.push({
           type: event,
-          name: name
+          name: pathToFileURL(name).toString()
         });
       }
     });
     this._watcher.on('error', console.error);
   }
 
-  forceFileLoad(fileName) {
+  forceFileLoad(fileNameURL) {
+    const fileName = fileURLToPath(fileNameURL);
     if (fileName.startsWith(this._embedderPath) && fs.existsSync(fileName))
-      this._client.filesChanged([{type: 'add', name: fileName}]);
+      this._client.filesChanged([{type: 'add', name: fileNameURL}]);
   }
 
   dispose() {
