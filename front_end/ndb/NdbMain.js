@@ -204,18 +204,19 @@ Ndb.NodeProcessManager = class extends Common.Object {
 
   async detected(info, channel) {
     const connection = await Ndb.Connection.create(channel);
-    const networkInterceptor = new Ndb.NetworkInterceptor();
-    connection.addInterceptor(networkInterceptor);
     const target = this._targetManager.createTarget(
         info.id, userFriendlyName(info), SDK.Target.Type.Node,
         this._targetManager.targetById(info.ppid) || this._targetManager.mainTarget(), undefined, false, connection);
-    networkInterceptor.setTarget(target);
-    target[NdbSdk.connectionSymbol] = connection;
 
     target.runtimeAgent().invoke_evaluate({
       expression: await Ndb.backend.httpMonkeyPatchingSource(),
       includeCommandLineAPI: true
     });
+
+    const networkInterceptor = new Ndb.NetworkInterceptor();
+    connection.addInterceptor(networkInterceptor);
+    networkInterceptor.setTarget(target);
+    target[NdbSdk.connectionSymbol] = connection;
 
     await this.addFileSystem(info.cwd, info.scriptName);
     if (info.scriptName) {
