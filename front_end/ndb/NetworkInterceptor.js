@@ -35,7 +35,7 @@ Ndb.NetworkInterceptor = class extends Ndb.ConnectionInterceptor {
 
   _sendRawMessage(rawMessage) {}
 
-  _listen() {
+  async _listen() {
     InspectorFrontendHost.sendMessageToBackend = rawMessage => {
       const message = JSON.parse(rawMessage);
 
@@ -61,45 +61,39 @@ Ndb.NetworkInterceptor = class extends Ndb.ConnectionInterceptor {
       }
     };
 
-    // we need to setTimeout here because the httpMonkeyPatchingSource is loaded
-    // after this script
-    setTimeout(async() => {
-      while (this._target) {
-        try {
-          const raw = await this._target
-              .runtimeAgent()
-              .invoke_evaluate({
-                expression: `process._fetchNetworkMessages()`,
-                awaitPromise: true,
-                returnByValue: true
-              });
+    while (this._target) {
+      const rawResponse = await this._target
+          .runtimeAgent()
+          .invoke_evaluate({
+            expression: `process._fetchNetworkMessages()`,
+            awaitPromise: true,
+            returnByValue: true
+          });
 
-          const {
-            result: { value: messages }
-          } = raw;
+      if (!rawResponse || !rawResponse.result) return;
 
-          if (!messages) return;
+      const {
+        result: { value: messages }
+      } = rawResponse;
 
-          // messages is array-like
-          const messagesArr = Array.from(JSON.parse(messages));
+      if (!messages) return;
 
-          for (const message of messagesArr) {
-            const { type, payload } = message;
-            this._cacheRequests.push(message);
+      // messages is array-like
+      const messagesArr = Array.from(JSON.parse(messages));
 
-            // this is on the way back, this way doesn't work
-            if (type !== 'Network.getResponseBody') {
-              // but this does
-              SDK._mainConnection._onMessage(JSON.stringify({
-                method: type,
-                params: payload
-              }));
-            }
-          }
-        } catch (err) {
-          console.log({ err });
+      for (const message of messagesArr) {
+        const { type, payload } = message;
+        this._cacheRequests.push(message);
+
+        // this is on the way back, this way doesn't work
+        if (type !== 'Network.getResponseBody') {
+          // but this does
+          SDK._mainConnection._onMessage(JSON.stringify({
+            method: type,
+            params: payload
+          }));
         }
       }
-    }, 0);
+    }
   }
 };
