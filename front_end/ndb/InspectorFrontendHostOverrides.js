@@ -4,7 +4,7 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-(function(){
+(async function(){
   InspectorFrontendHost.getPreferences = async function(callback) {
     [Ndb.backend] = await carlo.loadParams();
     const prefs = {
@@ -30,4 +30,53 @@
       callback({statusCode: 404});
     }
   };
+
+  // InspectorFrontendHost.sendMessageToBackend = rawMessage => {
+  //   const parsedMes = JSON.parse(rawMessage);
+  //   if (parsedMes.method !== 'Network.getResponseBody')
+  //     return;
+  //
+  //   const mes = await target.runtimeAgent().invoke_evaluate({
+  //     expression: `process._sendMessage(${JSON.stringify(JSON.parse(rawMessage))})`,
+  //     awaitPromise: true
+  //   });
+  //
+  //   if (!mes.result) return;
+  //   try {
+  //     const [id, result] = mes.result.value;
+  //     if (result) {
+  //       InspectorFrontendHost.events.dispatchEventToListeners(
+  //           InspectorFrontendHostAPI.Events.DispatchMessage,
+  //           {
+  //             id,
+  //             result
+  //           }
+  //       );
+  //     }
+  //   } catch (err) {
+  //     console.log(err);
+  //   }
+  // };
+  //
+  // while (true) {
+  //   const message = await target.runtimeAgent().invoke_evaluate({
+  //     expression: 'process._getNetworkMessages()',
+  //     awaitPromise: true
+  //   });
+  //
+  //   if (!message.result) return;
+  //   const arrMessages = JSON.parse(message.result.value);
+  //
+  //   for (const mes of arrMessages) {
+  //     const { type, payload } = mes;
+  //
+  //     if (type) {
+  //       SDK._mainConnection._onMessage(JSON.stringify({
+  //         method: type,
+  //         params: payload
+  //       }));
+  //     }
+  //   }
+  // }
+
 })();

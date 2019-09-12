@@ -76,7 +76,8 @@ Ndb.FileSystem = class extends Persistence.PlatformFileSystem {
    */
   getMetadata(path) {
     // This method should never be called as long as we are matching using file urls.
-    throw new Error('not implemented');
+    // throw new Error('not implemented');
+    return Promise.resolve('');
   }
 
   /**
