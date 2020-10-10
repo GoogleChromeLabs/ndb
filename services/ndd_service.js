@@ -95,8 +95,13 @@ class NddService {
     const pipeName = `node-ndb.${process.pid}.sock`;
     this._pipe = path.join(pipePrefix, pipeName);
     const server = net.createServer(socket => {
+      const chunks = [];
       socket.on('data', async d => {
-        const runSession = await this._startSession(JSON.parse(d), frontend);
+        chunks.push(d);
+      });
+      socket.on('end', async() => {
+        const data = Buffer.concat(chunks);
+        const runSession = await this._startSession(JSON.parse(data), frontend);
         socket.write('run');
         runSession();
       });
