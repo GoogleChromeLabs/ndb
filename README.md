@@ -69,7 +69,7 @@ ndb npm run unit
 ndb mocha
 
 # To use a local binary, use `npx` and prepend before it
-ndb npx mocha
+npx ndb mocha
 ```
 
 - Launch `ndb` as a standalone application 
